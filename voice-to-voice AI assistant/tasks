@@ -1,0 +1,7 @@
+1. record and play sounds
+- experimented with different audio formats
+- record audio => sounddevice (record audio data as numpy array) & scipy.io.wavfile.write() (to save that numpy array in .wav)
+- convert & save audio => .wav to mp3 or vice-versa => pydub (pydub.AudioSegment.from_wav("file.wav")) & export it (.export("file.mp3", format="mp3")) [requires ffmpeg]
+- play mp3 => pygame
+- play wav => simpleaudio
+  
