@@ -1,0 +1,107 @@
+[
+    {
+      "question_id": 1,
+      "question": "What is a Computer System?",
+      "ideal_answer": "A computer system is a combination of CPU, memory, the operating system, and supplementary devices (e.g., keyboard, mouse, monitor, storage) that work together to perform computational tasks.",
+      "topic": "Systems",
+      "difficulty": "Easy"
+    },
+    {
+      "question_id": 2,
+      "question": "What is an array?",
+      "ideal_answer": "An array is a data structure that stores a collection of elements of the same data type in contiguous memory, allowing efficient access and manipulation using indices.",
+      "topic": "Data Structures",
+      "difficulty": "Easy"
+    },
+    {
+      "question_id": 3,
+      "question": "What is a microprocessor?",
+      "ideal_answer": "A microprocessor is an integrated circuit that functions as the central processing unit (CPU) of a computer system, performing logic, arithmetic, control, and input/output operations.",
+      "topic": "Hardware",
+      "difficulty": "Medium"
+    },
+    {
+      "question_id": 4,
+      "question": "What is debugging?",
+      "ideal_answer": "Debugging is the process of identifying, evaluating, and correcting software problems (bugs) to ensure the program runs as intended.",
+      "topic": "Software Engineering",
+      "difficulty": "Easy"
+    },
+    {
+      "question_id": 5,
+      "question": "What is an IP address?",
+      "ideal_answer": "An IP (Internet Protocol) address is a unique identifier assigned to devices on a network, enabling them to communicate over the internet. There are IPv4 (32-bit) and IPv6 (128-bit) formats.",
+      "topic": "Networking",
+      "difficulty": "Medium"
+    },
+    {
+      "question_id": 6,
+      "question": "What is a loop in programming?",
+      "ideal_answer": "A loop is a control structure that repeats a block of code multiple times based on a condition. Common types include for-loop, while-loop, and do-while-loop.",
+      "topic": "Programming Fundamentals",
+      "difficulty": "Easy"
+    },
+    {
+      "question_id": 7,
+      "question": "What is a relational database?",
+      "ideal_answer": "A relational database stores data in tables with rows and columns, with relationships defined via primary and foreign keys. Examples include MySQL, PostgreSQL, and Oracle, usually accessed with SQL.",
+      "topic": "Databases",
+      "difficulty": "Medium"
+    },
+    {
+      "question_id": 8,
+      "question": "What is the difference between stack and queue?",
+      "ideal_answer": "A stack is a Last-In-First-Out (LIFO) data structure, while a queue is a First-In-First-Out (FIFO) data structure. Stack operations are push and pop, queue operations are enqueue and dequeue.",
+      "topic": "Data Structures",
+      "difficulty": "Medium"
+    },
+    {
+      "question_id": 9,
+      "question": "What is the difference between compilation and interpretation?",
+      "ideal_answer": "Compilation translates the entire program into machine code before execution, while interpretation translates and executes code line-by-line at runtime.",
+      "topic": "Programming Languages",
+      "difficulty": "Medium"
+    },
+    {
+      "question_id": 10,
+      "question": "What is multithreading?",
+      "ideal_answer": "Multithreading is a programming technique where multiple threads run concurrently within a single process, allowing parallel execution and improved performance for certain tasks.",
+      "topic": "Operating Systems",
+      "difficulty": "Hard"
+    },
+    {
+      "question_id": 11,
+      "question": "What is normalization in databases?",
+      "ideal_answer": "Normalization is the process of organizing data in a database to reduce redundancy and improve data integrity, typically done in normal forms like 1NF, 2NF, and 3NF.",
+      "topic": "Databases",
+      "difficulty": "Medium"
+    },
+    {
+      "question_id": 12,
+      "question": "What is an algorithm?",
+      "ideal_answer": "An algorithm is a step-by-step set of instructions to solve a specific problem or perform a computation.",
+      "topic": "Algorithms",
+      "difficulty": "Easy"
+    },
+    {
+      "question_id": 13,
+      "question": "What is cloud computing?",
+      "ideal_answer": "Cloud computing is the delivery of computing services like servers, storage, databases, networking, software, and analytics over the internet to offer faster innovation and flexible resources.",
+      "topic": "Cloud",
+      "difficulty": "Medium"
+    },
+    {
+      "question_id": 14,
+      "question": "What is big O notation?",
+      "ideal_answer": "Big O notation describes the upper bound of the time or space complexity of an algorithm, providing a way to compare algorithm efficiency as input size grows.",
+      "topic": "Algorithms",
+      "difficulty": "Hard"
+    },
+    {
+      "question_id": 15,
+      "question": "What is the difference between TCP and UDP?",
+      "ideal_answer": "TCP is a connection-oriented, reliable protocol ensuring ordered delivery, while UDP is a connectionless, faster but less reliable protocol without guaranteed ordering.",
+      "topic": "Networking",
+      "difficulty": "Medium"
+    }
+  ]  
