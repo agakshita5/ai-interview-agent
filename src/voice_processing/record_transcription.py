@@ -1,40 +1,21 @@
 '''recording audio'''
-
 import sounddevice as sd
 from scipy.io.wavfile import write
 
-fs = 44100  # Sample rate
-seconds = 5  # Duration of recording
-
-myrecording = sd.rec(int(seconds * fs), samplerate=fs, channels=1)
-print("Recording...")
-sd.wait()  
-print("Recording finished")
-write('/Users/agakshita/AI/voice-to-voice-ai-assistant/record-output.wav', fs, myrecording) 
-print("WAV file saved")
-
-'''playing wav file'''
-
-
-'''
-task pr for each
-master branch code
-task list (to-do)
-to do (in progress)
-new task new pr/branch - branch nm = task nm
-pr (merge)
-new task
-'''
+def record_audio(fs=44100, duration=10, output_file='data/recorded_audio.wav'):
+    myrecording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
+    sd.wait()  
+    write(output_file, fs, myrecording) 
 
 '''transcibing audio using whisper'''
 import whisper
 
-model = whisper.load_model("turbo")
-user_input = model.transcribe("record-output.wav")
-user_prompt = user_input["text"]
+def transcribe_audio(audio_file:str):
+    model = whisper.load_model("turbo")
+    audio_input = model.transcribe(audio_file)
+    return audio_input["text"]
 
 '''ai reasoning'''
-
 from groq import Groq
 import os
 
@@ -59,10 +40,26 @@ assistant_reply = ask_groq(user_prompt)
 
 '''text -> speech'''
 
-from gtts import gTTS
+# from gtts import gTTS
+# tts = gTTS(assistant_reply)
+# tts.save("/Users/agakshita/AI/voice-to-voice-ai-assistant/response.mp3")
 
-tts = gTTS(assistant_reply)
-tts.save("/Users/agakshita/AI/voice-to-voice-ai-assistant/response.mp3")
+from google.cloud import texttospeech
+client = texttospeech.TextToSpeechClient()
+def generate_speech(text: str, output_file: str = "data/response.mp3", accent: str = "en-US-Standard-C"):
+    input_text = texttospeech.SynthesisInput(text=text)
+    voice = texttospeech.VoiceSelectionParams(
+        name=accent, 
+        language_code="en-US")
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3)
+    response = client.synthesize_speech(
+        input=input_text,
+        voice=voice,
+        audio_config=audio_config)
+    # The response's audio_content is binary.
+    with open(output_file, "wb") as out:
+        out.write(response.audio_content)
 
 '''playing response'''
 from pygame import mixer
