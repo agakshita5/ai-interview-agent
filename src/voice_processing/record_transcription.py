@@ -35,7 +35,7 @@ def ask_groq(prompt):
     )
     return completion.choices[0].message.content
 
-assistant_reply = ask_groq(user_prompt)
+assistant_reply = ask_groq(transcribe_audio("data/recorded_audio.wav"))
 
 
 '''text -> speech'''
@@ -65,7 +65,7 @@ def generate_speech(text: str, output_file: str = "data/response.mp3", accent: s
 from pygame import mixer
 import time
 mixer.init()
-mixer.music.load('/Users/agakshita/AI/voice-to-voice-ai-assistant/response.mp3')
+mixer.music.load('data/response.mp3')
 mixer.music.play()
 while mixer.music.get_busy(): 
     time.sleep(1)
