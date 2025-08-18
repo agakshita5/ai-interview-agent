@@ -19,6 +19,7 @@ for i in range(15):
 
 # pydantic model
 class InterviewInput(BaseModel):
+    candidate_name: str
     candidate_answer: str
 
 @app.get("/")
@@ -26,9 +27,9 @@ def first_point():
     return {"got":"you"}
     # return {"groq_key": os.getenv("GROQ_API_KEY")}
 #    - "/start_session"  → start an interview
-@app.get("/start_session")
-async def start_session():
-    return {"intro_prompt": yaml_file['introduction_prompt'],"question_set":ques_set}
+@app.post("/start_session")
+async def start_session(data: InterviewInput):
+    return {"intro_prompt": yaml_file['introduction_prompt'].format(candidate_name = data.candidate_name),"question_set":ques_set}
 #    - "/ask_question"   → get next interview question
 @app.get("/ask_question/{ques_id}")
 async def ask_question(ques_id: int):
