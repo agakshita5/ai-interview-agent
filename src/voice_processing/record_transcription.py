@@ -58,10 +58,10 @@ def ask_groq(prompt):
 #         out.write(response.audio_content)
 #     return output_file
 from gtts import gTTS
-tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC")
-
-def generate_speech(text: str, output_file: str):
-    tts.tts_to_file(text=text, file_path=output_file)
+def generate_speech(text: str, output_file: str, lang: str = "en", accent: str = "com"):
+    # :param accent: Accent domain ('com' = US, 'co.uk' = UK, 'co.in' = Indian, etc.).
+    tts = gTTS(text=text, lang=lang, tld=accent)  
+    tts.save(output_file)
     return output_file
 
 '''playing response'''
