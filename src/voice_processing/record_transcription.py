@@ -2,7 +2,7 @@
 import sounddevice as sd
 from scipy.io.wavfile import write
 
-def record_audio(fs=44100, duration=10, output_file='data/recorded_audio.wav'):
+def record_audio(output_file,fs=44100, duration=10):
     myrecording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
     sd.wait()  
     write(output_file, fs, myrecording) 
@@ -11,7 +11,7 @@ def record_audio(fs=44100, duration=10, output_file='data/recorded_audio.wav'):
 import whisper
 
 def transcribe_audio(audio_file:str):
-    model = whisper.load_model("turbo")
+    model = whisper.load_model("base")
     audio_input = model.transcribe(audio_file)
     return audio_input["text"]
 
@@ -35,37 +35,42 @@ def ask_groq(prompt):
     )
     return completion.choices[0].message.content
 
-assistant_reply = ask_groq(transcribe_audio("data/recorded_audio.wav"))
+# assistant_reply = ask_groq(transcribe_audio("data/recorded_audio.wav"))
 
 
 '''text -> speech'''
 
-# from gtts import gTTS
-# tts = gTTS(assistant_reply)
-# tts.save("/Users/agakshita/AI/voice-to-voice-ai-assistant/response.mp3")
+# from google.cloud import texttospeech
+# client = texttospeech.TextToSpeechClient()
+# def generate_speech(text: str, output_file: str, accent: str = "en-US-Standard-C"):
+#     input_text = texttospeech.SynthesisInput(text=text)
+#     voice = texttospeech.VoiceSelectionParams(
+#         name=accent, 
+#         language_code="en-US")
+#     audio_config = texttospeech.AudioConfig(
+#         audio_encoding=texttospeech.AudioEncoding.MP3)
+#     response = client.synthesize_speech(
+#         input=input_text,
+#         voice=voice,
+#         audio_config=audio_config)
+#     # The response's audio_content is binary.
+#     with open(output_file, "wb") as out:
+#         out.write(response.audio_content)
+#     return output_file
+from gtts import gTTS
+tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC")
 
-from google.cloud import texttospeech
-client = texttospeech.TextToSpeechClient()
-def generate_speech(text: str, output_file: str = "data/response.mp3", accent: str = "en-US-Standard-C"):
-    input_text = texttospeech.SynthesisInput(text=text)
-    voice = texttospeech.VoiceSelectionParams(
-        name=accent, 
-        language_code="en-US")
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3)
-    response = client.synthesize_speech(
-        input=input_text,
-        voice=voice,
-        audio_config=audio_config)
-    # The response's audio_content is binary.
-    with open(output_file, "wb") as out:
-        out.write(response.audio_content)
+def generate_speech(text: str, output_file: str):
+    tts.tts_to_file(text=text, file_path=output_file)
+    return output_file
 
 '''playing response'''
 from pygame import mixer
 import time
-mixer.init()
-mixer.music.load('data/response.mp3')
-mixer.music.play()
-while mixer.music.get_busy(): 
-    time.sleep(1)
+def play_audio(audio_file: str):
+    mixer.init()
+    mixer.music.load(audio_file)
+    mixer.music.play()
+    while mixer.music.get_busy(): 
+        time.sleep(1)
+    
