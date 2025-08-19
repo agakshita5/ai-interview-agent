@@ -57,11 +57,31 @@ def ask_groq(prompt):
 #     with open(output_file, "wb") as out:
 #         out.write(response.audio_content)
 #     return output_file
-from gtts import gTTS
-def generate_speech(text: str, output_file: str, lang: str = "en", accent: str = "co.in"):
-    # :param accent: Accent domain ('com' = US, 'co.uk' = UK, 'co.in' = Indian, etc.).
-    tts = gTTS(text=text, lang=lang, tld=accent)  
-    tts.save(output_file)
+
+# from gtts import gTTS
+# def generate_speech(text: str, output_file: str, lang: str = "en", accent: str = "co.in"):
+#     # :param accent: Accent domain ('com' = US, 'co.uk' = UK, 'co.in' = Indian, etc.).
+#     tts = gTTS(text=text, lang=lang, tld=accent)  
+#     tts.save(output_file)
+#     return output_file
+
+import wave
+from piper import PiperVoice
+from piper import SynthesisConfig
+
+def generate_speech(text: str, output_file: str, model_path: str = "en_US-lessac-medium.onnx"):# Load voice model
+    voice = PiperVoice.load(model_path)
+
+    syn_config = SynthesisConfig(
+        volume=1.0,        # normal loudness
+        length_scale=1.2,  # normal speed (increase for slower, <1 for faster)
+        noise_scale=0.667, # natural variation
+        noise_w_scale=0.8  # speaking style variation
+    )
+
+    with wave.open(output_file, "wb") as wav_file:
+        voice.synthesize_wav(text, wav_file, syn_config=syn_config)
+
     return output_file
 
 '''playing response'''

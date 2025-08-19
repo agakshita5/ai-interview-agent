@@ -1,50 +1,79 @@
-import py_compile
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import Optional
+
 from src.utils.config import load_config
 from src.api_integration.api_client import get_question_set
-from src.voice_processing.record_transcription import generate_speech, play_audio
-from dotenv import load_dotenv
-import os
+from src.voice_processing.record_transcription import generate_speech
+from src.nlp_evaluation.answer_evaluator import evaluate_answer
+from src.nlp_evaluation.question_generator import generate_followup
+from src.session.session_manager import run_interview, personalize_intro, answer_candidate_question
 
-load_dotenv()
 app = FastAPI()
 
-yaml_file = load_config()
+config = load_config()
 
-# question set -> list
-ques_set=[]
-for i in range(15):
-    ques_set.append(get_question_set(i)['question'])
 
-# pydantic model
-class InterviewInput(BaseModel):
+class StartInterviewRequest(BaseModel):
     candidate_name: str
-    candidate_answer: str
+    interview_set_name: str
 
-@app.get("/")
-def first_point():
-    return {"got":"you"}
-    # return {"groq_key": os.getenv("GROQ_API_KEY")}
-#    - "/start_session"  → start an interview
-@app.post("/start_session")
-async def start_session(data: InterviewInput):
-    return {"intro_prompt": yaml_file['introduction_prompt'].format(candidate_name = data.candidate_name),"question_set":ques_set}
-#    - "/ask_question"   → get next interview question
-@app.get("/ask_question/{ques_id}")
-async def ask_question(ques_id: int):
-    if ques_id < 0 or ques_id >= len(ques_set):
-        raise HTTPException(status_code=404, detail="Question not found")
-    return {"question":ques_set[ques_id]}
-#    - "/submit_answer"  → candidate’s voice/text answer (evaluate it)
-@app.post("/submit_answer/{ques_id}")
-async def submit_answer(ques_id: int, data: InterviewInput):
-    audio_file = generate_speech(data.candidate_answer, "data/response.mp3")
-    return {"audio_file": audio_file, "question_id": ques_id, "answer": data.candidate_answer}
-#    - "/end_session"    → close interview
-@app.get("/end_session")
-async def end_session():
-    return {"outro_prompt": yaml_file['conclusion_prompt']}
-    
-# 5. Later: add endpoints for voice STT, TTS, API integration
-# -------------------------------------------------
+
+class AskQuestionRequest(BaseModel):
+    question: str
+    candidate_response: str
+
+
+class IntroRequest(BaseModel):
+    candidate_name: str
+
+
+class CandidateQuestionRequest(BaseModel):
+    question: str
+
+
+@app.post("/start_interview")
+async def start_interview(req: StartInterviewRequest):
+    result = run_interview(req.candidate_name, req.interview_set_name)
+    return result
+
+
+@app.post("/ask_question")
+async def ask_question(req: AskQuestionRequest):
+    # Evaluate the candidate response against the ideal answer of a matching question if available
+    # For now, find the first question in the dataset that matches req.question text
+    try:
+        ideal_answer: Optional[str] = None
+        # naive scan over the first 15 questions
+        for i in range(15):
+            item = get_question_set(i)
+            if item.get("question") == req.question:
+                ideal_answer = item.get("ideal_answer")
+                break
+        if ideal_answer is None:
+            raise HTTPException(status_code=404, detail="Question not found in set")
+
+        rating = evaluate_answer(req.candidate_response, ideal_answer)
+        followup_question: Optional[str] = None
+        if rating in ["POOR", "SATISFACTORY"]:
+            followup_question = generate_followup(req.candidate_response)
+        return {"rating": rating, "followup_question": followup_question}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/intro")
+async def intro(req: IntroRequest):
+    text = personalize_intro(req.candidate_name)
+    # Generate optional mp3
+    mp3_path = generate_speech(text, "data/response.mp3")
+    return {"text": text, "mp3_path": mp3_path}
+
+
+@app.post("/candidate_question")
+async def candidate_question(req: CandidateQuestionRequest):
+    answer = answer_candidate_question(req.question)
+    return {"answer": answer}
+
