@@ -66,21 +66,25 @@ def ask_groq(prompt):
 #     return output_file
 
 import wave
-from piper import PiperVoice
-from piper import SynthesisConfig
+from piper import PiperVoice, SynthesisConfig
+from pydub import AudioSegment
 
 def generate_speech(text: str, output_file: str, model_path: str = "en_US-lessac-medium.onnx"):# Load voice model
     voice = PiperVoice.load(model_path)
-
+    temp_wav = "data/temp.wav"
     syn_config = SynthesisConfig(
-        volume=1.0,        # normal loudness
-        length_scale=1.2,  # normal speed (increase for slower, <1 for faster)
-        noise_scale=0.667, # natural variation
-        noise_w_scale=0.8  # speaking style variation
+        volume=1.0,        
+        length_scale=1.3,  
+        noise_scale=0.667, 
+        noise_w_scale=0.8  
     )
 
-    with wave.open(output_file, "wb") as wav_file:
+    with wave.open(temp_wav, "wb") as wav_file:
         voice.synthesize_wav(text, wav_file, syn_config=syn_config)
+
+    # Convert to MP3
+    sound = AudioSegment.from_wav(temp_wav)
+    sound.export(output_file, format="mp3")
 
     return output_file
 
