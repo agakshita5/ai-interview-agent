@@ -4,3 +4,4 @@ myvenv/
 __pycache__/
 **/.mp3
 en_US-lessac-medium.onnx.json
+**/.wav
