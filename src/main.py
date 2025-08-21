@@ -58,26 +58,6 @@ async def start_agent(req: StartAgentRequest):
 
 @app.post("/agent/ask")
 async def ask_question(req: AskQuestionRequest):
-    # try:
-    #     ideal_answer: Optional[str] = None
-    #     for i in range(15):
-    #         item = get_question_set(i)
-    #         if item.get("question") == req.question:
-    #             ideal_answer = item.get("ideal_answer")
-    #             break
-    #     if ideal_answer is None:
-    #         raise HTTPException(status_code=404, detail="Question not found in set")
-
-    #     rating = evaluate_answer(req.candidate_response, ideal_answer)
-    #     followup_question: Optional[str] = None
-    #     if rating in ["POOR", "SATISFACTORY"]:
-    #         followup_question = generate_followup(req.candidate_response)
-    #     return {"rating": rating, "followup_question": followup_question}
-    # except HTTPException:
-    #     raise
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=str(e))
-
     session_id = req.session_id
     if session_id not in sessions:
         return JSONResponse({"error": "Invalid session"}, status_code=400)
@@ -158,12 +138,4 @@ async def get_report(session_id: str):
 
     return {"session_id": session_id, "report": sessions[session_id].get("report", "Report not generated yet.")}
 
-@app.post("/transcribe")
-async def transcribe_file(audio: UploadFile = File(...)):
-    os.makedirs("data", exist_ok=True)
-    tmp_path = os.path.join("data", f"upload_{uuid.uuid4()}.wav")
-    with open(tmp_path, "wb") as f:
-        f.write(await audio.read())
-    text = stt_transcribe_audio(tmp_path)
-    return {"text": text}
 
