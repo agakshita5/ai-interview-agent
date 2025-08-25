@@ -33,7 +33,6 @@ sessions: Dict[str, Dict[str, Any]] = {}
 @app.post("/agent/start")
 async def start_agent(req: StartAgentRequest):
     session_id = str(uuid.uuid4())
-    # Load question set (mock: first 15 from local file)
     questions: List[Dict[str, Any]] = []
     for i in range(15):
         try:
@@ -51,7 +50,6 @@ async def start_agent(req: StartAgentRequest):
         "report": None,
     }
 
-    # Personalize intro (LLM optional; keep prompt-based for now)
     intro_text = personalize_intro(req.candidate_name)
     mp3_path = generate_speech(intro_text, f"data/{session_id}_intro.mp3")
     return {"session_id": session_id, "intro_text": intro_text, "intro_mp3": mp3_path}
@@ -88,7 +86,6 @@ async def respond(session_id: str, audio: UploadFile = File(...)):
     if awaiting_idx is None:
         return JSONResponse({"error": "No question awaiting an answer"}, status_code=400)
 
-    # Persist uploaded audio then transcribe
     os.makedirs("data", exist_ok=True)
     audio_path = os.path.join("data", f"{session_id}_response_{awaiting_idx}.wav")
     with open(audio_path, "wb") as f:
