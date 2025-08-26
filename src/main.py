@@ -6,7 +6,7 @@ import uuid
 import os
 from src.utils.config import load_config
 from src.api_integration.api_client import get_question_set
-from src.voice_processing.record_transcription import generate_speech, transcribe_audio as stt_transcribe_audio, ask_groq
+from src.voice_processing.record_transcription import generate_speech, transcribe_audio as stt_transcribe_audio, ask_groq, record_audio, play_audio
 from src.nlp_evaluation.answer_evaluator import evaluate_answer
 from src.nlp_evaluation.question_generator import generate_followup
 from src.session.session_manager import run_interview, personalize_intro, answer_candidate_question
@@ -33,25 +33,21 @@ sessions: Dict[str, Dict[str, Any]] = {}
 @app.post("/agent/start")
 async def start_agent(req: StartAgentRequest):
     session_id = str(uuid.uuid4())
-    questions: List[Dict[str, Any]] = []
-    for i in range(15):
-        try:
-            questions.append(get_question_set(i))
-        except Exception:
-            break
+    questions = [get_question_set(i) for i in range(15) if get_question_set(i)]
 
     sessions[session_id] = {
         "candidate_name": req.candidate_name,
         "interview_set_name": req.interview_set_name,
         "questions": questions,
-        "current_idx": 0,  # next question to ask
-        "awaiting_answer_index": None,  # index of last asked question
+        "current_idx": 0,  
+        "awaiting_answer_index": None,  
         "responses": [],  # list of {question_id, text, rating, followup?}
         "report": None,
     }
 
     intro_text = personalize_intro(req.candidate_name)
     mp3_path = generate_speech(intro_text, f"data/{session_id}_intro.mp3")
+    play_audio(mp3_path)
     return {"session_id": session_id, "intro_text": intro_text, "intro_mp3": mp3_path}
 
 @app.post("/agent/ask")
@@ -74,6 +70,7 @@ async def ask_question(req: AskQuestionRequest):
     session["current_idx"] = idx + 1
 
     mp3_path = generate_speech(question_text, f"data/{session_id}_question_{idx}.mp3")
+    play_audio(mp3_path)
     return {"question_text": question_text, "mp3_path": mp3_path, "question_id": question_obj.get("question_id", idx + 1)}
 
 @app.post("/agent/respond")
@@ -86,10 +83,7 @@ async def respond(session_id: str, audio: UploadFile = File(...)):
     if awaiting_idx is None:
         return JSONResponse({"error": "No question awaiting an answer"}, status_code=400)
 
-    os.makedirs("data", exist_ok=True)
-    audio_path = os.path.join("data", f"{session_id}_response_{awaiting_idx}.wav")
-    with open(audio_path, "wb") as f:
-        f.write(await audio.read())
+    audio_path = record_audio(output_file=f"data/{session_id}_response_{awaiting_idx}.wav")
 
     candidate_text = stt_transcribe_audio(audio_path)
 
@@ -103,6 +97,7 @@ async def respond(session_id: str, audio: UploadFile = File(...)):
     if rating in ["POOR", "SATISFACTORY"]:
         follow_up_text = ask_groq(candidate_text)
         followup_mp3 = generate_speech(follow_up_text, f"data/{session_id}_followup_{awaiting_idx}.mp3")
+        play_audio(followup_mp3)
 
     # Store response record
     session["responses"].append({
@@ -130,9 +125,4 @@ async def get_report(session_id: str):
     if session_id not in sessions:
         return JSONResponse({"error": "Invalid session"}, status_code=400)
 
-    # Example: Generate evaluation summary later
-    # sessions[session_id]["report"] = "Candidate did well in communication skills..."
-
     return {"session_id": session_id, "report": sessions[session_id].get("report", "Report not generated yet.")}
-
-

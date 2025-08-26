@@ -35,36 +35,7 @@ def ask_groq(prompt):
     )
     return completion.choices[0].message.content
 
-# assistant_reply = ask_groq(transcribe_audio("data/recorded_audio.wav"))
-
-
 '''text -> speech'''
-
-# from google.cloud import texttospeech
-# client = texttospeech.TextToSpeechClient()
-# def generate_speech(text: str, output_file: str, accent: str = "en-US-Standard-C"):
-#     input_text = texttospeech.SynthesisInput(text=text)
-#     voice = texttospeech.VoiceSelectionParams(
-#         name=accent, 
-#         language_code="en-US")
-#     audio_config = texttospeech.AudioConfig(
-#         audio_encoding=texttospeech.AudioEncoding.MP3)
-#     response = client.synthesize_speech(
-#         input=input_text,
-#         voice=voice,
-#         audio_config=audio_config)
-#     # The response's audio_content is binary.
-#     with open(output_file, "wb") as out:
-#         out.write(response.audio_content)
-#     return output_file
-
-# from gtts import gTTS
-# def generate_speech(text: str, output_file: str, lang: str = "en", accent: str = "co.in"):
-#     # :param accent: Accent domain ('com' = US, 'co.uk' = UK, 'co.in' = Indian, etc.).
-#     tts = gTTS(text=text, lang=lang, tld=accent)  
-#     tts.save(output_file)
-#     return output_file
-
 import wave
 from piper import PiperVoice, SynthesisConfig
 from pydub import AudioSegment
