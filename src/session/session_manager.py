@@ -1,4 +1,7 @@
 from src.utils.config import load_config
+from src.api_integration.api_client import get_question_set
+from src.voice_processing.record_transcription import generate_speech, transcribe_audio as stt_transcribe_audio, ask_groq, record_audio, play_audio
+from src.nlp_evaluation.answer_evaluator import evaluate_answer
 import json
 from typing import Dict, List
 
@@ -15,34 +18,69 @@ def answer_candidate_question(question: str) -> str:
             return answer
     return "Can you clarify your question?"
 
-def _load_ratings() -> List[Dict]:
-    with open("data/ratings.json", "r") as f:
-        return json.load(f)
 
+def run_interview(session: dict, mode: str = "AGENT"):
+    config = load_config()
+    if mode == "AGENT":
+        # Pre-interview
+        intro_text = personalize_intro(session["candidate_name"])
+        intro_mp3 = generate_speech(intro_text, f"data/{session['session_id']}_intro.mp3")
+        play_audio(intro_mp3)
+        # Live interview
+        for idx, question_obj in enumerate(session["questions"]):
+            # question asked
+            question_text = question_obj["question"]
+            mp3_path = generate_speech(question_text, f"data/{session['session_id']}_question_{idx}.mp3")
+            play_audio(mp3_path)
+            # response recorded
+            audio_path = record_audio(f"data/{session['session_id']}_response_{idx}.wav")
+            candidate_text = stt_transcribe_audio(audio_path)
+            # evaluated answer & rating recorded
+            rating = evaluate_answer(candidate_text, question_obj["ideal_answer"])
+            # follow-up question if rating bad
+            follow_up_text = None
+            if rating in ["POOR", "SATISFACTORY"]:
+                follow_up_text = ask_groq(candidate_text)
+                followup_mp3 = generate_speech(follow_up_text, f"data/{session['session_id']}_followup_{idx}.mp3")
+                play_audio(followup_mp3)
+                audio_path = record_audio(f"data/{session['session_id']}_followup_response_{idx}.wav")
+                candidate_text = stt_transcribe_audio(audio_path)
+                rating = evaluate_answer(candidate_text, question_obj["ideal_answer"])
 
-def run_interview(candidate_name: str, interview_set_name: str) -> Dict:
-    # For now, use the mock ratings dataset to simulate an interview summary
-    ratings_data = _load_ratings()
-
-    def score_to_bucket(score: float) -> str:
-        if score >= 8.5:
-            return "EXCELLENT"
-        if score >= 7.0:
-            return "GOOD"
-        if score >= 5.0:
-            return "SATISFACTORY"
-        return "POOR"
-
-    ratings = [score_to_bucket(item.get("score", 0.0)) for item in ratings_data]
-
-    bucket_to_value = {"POOR": 1, "SATISFACTORY": 2, "GOOD": 3, "EXCELLENT": 4}
-    numeric_scores = [bucket_to_value[r] for r in ratings]
-    average = sum(numeric_scores) / len(numeric_scores) if numeric_scores else 0
-    final_decision = "HIRE" if average > 2.5 else "REJECT"
-
-    return {
-        "candidate_name": candidate_name,
-        "interview_set": interview_set_name,
-        "ratings": ratings,
-        "decision": final_decision,
-    }
+            # response recorded
+            session["responses"].append({
+                "question_id": question_obj.get("question_id", idx + 1),
+                "question": question_text,
+                "candidate_text": candidate_text,
+                "rating": rating,
+                "follow_up": follow_up_text,
+            })
+        # Candidate Q&A
+        print("Do you have any questions for us?")
+        audio_path = record_audio(f"data/{session['session_id']}_candidate_question.wav")
+        candidate_question = stt_transcribe_audio(audio_path)
+        answer = answer_candidate_question(candidate_question)
+        answer_mp3 = generate_speech(answer, f"data/{session['session_id']}_candidate_answer.mp3")
+        play_audio(answer_mp3)
+        # Conclusion
+        conclusion_text = config["conclusion_prompt"]
+        conclusion_mp3 = generate_speech(conclusion_text, f"data/{session['session_id']}_conclusion.mp3")
+        play_audio(conclusion_mp3)
+        # Final feedback
+        ratings = [r["rating"] for r in session["responses"]]
+        score_map = {"POOR": 1, "SATISFACTORY": 2, "GOOD": 3, "EXCELLENT": 4}
+        avg_score = sum(score_map[r] for r in ratings) / len(ratings)
+        decision = "HIRE" if avg_score > 2.5 else "REJECT"
+        session["report"] = {
+            "candidate_name": session["candidate_name"],
+            "responses": session["responses"],
+            "average_score": avg_score,
+            "decision": decision,
+        }
+    elif mode == "TRANSCRIBER":
+        transcript = []
+        print("Transcriber Mode: Recording entire session...")
+        audio_path = record_audio(f"data/{session['session_id']}_full_session.wav", duration=300)
+        transcript.append(stt_transcribe_audio(audio_path))
+        session["report"] = {"transcript": " ".join(transcript)}
+    return session["report"]
