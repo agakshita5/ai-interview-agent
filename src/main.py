@@ -8,8 +8,7 @@ from src.utils.config import load_config
 from src.api_integration.api_client import get_question_set
 from src.voice_processing.record_transcription import generate_speech, transcribe_audio as stt_transcribe_audio, ask_groq, record_audio, play_audio
 from src.nlp_evaluation.answer_evaluator import evaluate_answer
-from src.nlp_evaluation.question_generator import generate_followup
-from src.session.session_manager import run_interview, personalize_intro, answer_candidate_question
+from src.session.session_manager import personalize_intro, run_interview
 
 app = FastAPI()
 
@@ -28,7 +27,7 @@ class IntroRequest(BaseModel):
 class CandidateQuestionRequest(BaseModel):
     question: str
 
-sessions: Dict[str, Dict[str, Any]] = {}
+sessions: Dict[str, Dict[str, Any]] = {} # key: session_id, value: session->dict(cnm, ivnm, ques[dict{'question_id', 'question', 'ideal_answer', 'topic', 'difficulty'}], curr_idx, aw_idx, response[], report)
 
 @app.post("/agent/start")
 async def start_agent(req: StartAgentRequest):
@@ -62,13 +61,14 @@ async def ask_question(req: AskQuestionRequest):
     if idx >= len(questions):
         return JSONResponse({"error": "No more questions"}, status_code=404)
 
-    question_obj = questions[idx]
+    question_obj = questions[idx] # question_obj is a dict
     question_text: str = question_obj.get("question", "")
 
     # Mark awaiting answer and advance pointer
     session["awaiting_answer_index"] = idx
     session["current_idx"] = idx + 1
 
+    # TODO: simulate meeting
     mp3_path = generate_speech(question_text, f"data/{session_id}_question_{idx}.mp3")
     play_audio(mp3_path)
     return {"question_text": question_text, "mp3_path": mp3_path, "question_id": question_obj.get("question_id", idx + 1)}
@@ -98,6 +98,9 @@ async def respond(session_id: str, audio: UploadFile = File(...)):
         follow_up_text = ask_groq(candidate_text)
         followup_mp3 = generate_speech(follow_up_text, f"data/{session_id}_followup_{awaiting_idx}.mp3")
         play_audio(followup_mp3)
+        audio_path = record_audio(f"data/{session_id}_followup_response_{awaiting_idx}.wav")
+        candidate_text = stt_transcribe_audio(audio_path)
+        rating = evaluate_answer(candidate_text, ideal_answer)
 
     # Store response record
     session["responses"].append({
@@ -119,10 +122,20 @@ async def respond(session_id: str, audio: UploadFile = File(...)):
         "followup_mp3": followup_mp3,
     }
    
+@app.post("/agent/transcribe")
+async def transcribe_session(session_id: str):
+    if session_id not in sessions:
+        return JSONResponse({"error": "Invalid session"}, status_code=400)
+    session = sessions[session_id]
+    report = run_interview({**session, "session_id": session_id}, mode="TRANSCRIBER")
+    sessions[session_id]["report"] = report
+    return {"session_id": session_id, "transcript": report["transcript"]}
 
 @app.get("/report/{session_id}")
 async def get_report(session_id: str):
     if session_id not in sessions:
         return JSONResponse({"error": "Invalid session"}, status_code=400)
-
-    return {"session_id": session_id, "report": sessions[session_id].get("report", "Report not generated yet.")}
+    report = sessions[session_id].get("report")
+    if not report:
+        return JSONResponse({"error": "Report not generated yet"}, status_code=400)
+    return {"session_id": session_id, "report": report}
