@@ -112,7 +112,7 @@ def ask_groq(prompt):
         return f"I apologize, but I'm unable to process your request right now. Please try again later. (Error: {str(e)[:100]})"
 
 '''text -> speech'''
-def generate_speech(text: str, output_file: str = "data/output.wav", model_path: str = "en_US-lessac-medium.onnx"):# Load voice model
+def generate_speech(text: str, output_file: str = "data/output.wav", model_path: str = "en_US-lessac-medium.onnx"):
     voice = PiperVoice.load(model_path)
     syn_config = SynthesisConfig(
         volume=1.0,        
