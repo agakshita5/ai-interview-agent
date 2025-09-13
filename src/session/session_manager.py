@@ -1,23 +1,44 @@
 from src.utils.config import load_config
-from src.api_integration.api_client import get_question_set
 from src.voice_processing.record_transcription import generate_speech, transcribe_audio as stt_transcribe_audio, ask_groq, record_audio, play_audio
 from src.nlp_evaluation.answer_evaluator import evaluate_answer
 import json
 from typing import Dict, List
+from sentence_transformers import SentenceTransformer
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+lang_model = SentenceTransformer("all-MiniLM-L6-v2")
 
+company_info = {
+  "culture": "We value innovation and collaboration.",
+  "mission": "To build cutting-edge AI products.",
+  "benefits": "We offer health insurance, flexible hours, and remote work options.",
+  "projects": "We are currently working on AI for healthcare and fintech."
+}
+comp_info_desc = list(company_info.values())
+embeddings_company = lang_model.encode(comp_info_desc)
+def answer_candidate_question(question: str) -> str:
+    embeddings_cand_ques = lang_model.encode(question)
+    # compute cosine similarities
+    similarities = lang_model.similarity(embeddings_company, embeddings_cand_ques)
+    closest_score = max(similarities).item()
+    closest_score_idx = similarities.argmax().item()
+    if closest_score >= 0.25:
+        confidence_note = "This is a strong match with company information."
+    else:
+        confidence_note = "This may not directly match company info, but please still give a natural response based on general company culture and values."
+        
+    groq_query = f"""
+    Candidate asked: {question}
+    Closest company info: {comp_info_desc[closest_score_idx]}
+    Note: {confidence_note}
+    Answer in a conversational tone.
+    Be concise and keep the response under 3 sentences.
+    """
+    return ask_groq(groq_query)
+    
 def personalize_intro(candidate_name: str) -> str:
     config = load_config()
     return config["introduction_prompt"].format(candidate_name=candidate_name)
-
-company_info = {"culture": "We value innovation and collaboration."}
-
-def answer_candidate_question(question: str) -> str:
-    lower_question = question.lower()
-    for key, answer in company_info.items():
-        if key in lower_question:
-            return answer
-    return "Can you clarify your question?"
-
 
 def run_interview(session: dict, mode: str = "AGENT"):
     config = load_config()
@@ -30,11 +51,11 @@ def run_interview(session: dict, mode: str = "AGENT"):
         for idx, question_obj in enumerate(session["questions"]):
             # question asked
             question_text = question_obj["question"]
-            mp3_path = generate_speech(question_text, f"data/{session['session_id']}_question_{idx}.mp3")
-            play_audio(mp3_path)
+            ques_mp3_path = generate_speech(question_text, f"data/{session['session_id']}_question_{idx}.mp3")
+            play_audio(ques_mp3_path)
             # response recorded
-            audio_path = record_audio(f"data/{session['session_id']}_response_{idx}.wav")
-            candidate_text = stt_transcribe_audio(audio_path)
+            response_audio_path = record_audio(output_file=f"data/{session['session_id']}_response_{idx}.wav")
+            candidate_text = stt_transcribe_audio(response_audio_path)
             # evaluated answer & rating recorded
             rating = evaluate_answer(candidate_text, question_obj["ideal_answer"])
             # follow-up question if rating bad
@@ -43,8 +64,8 @@ def run_interview(session: dict, mode: str = "AGENT"):
                 follow_up_text = ask_groq(candidate_text)
                 followup_mp3 = generate_speech(follow_up_text, f"data/{session['session_id']}_followup_{idx}.mp3")
                 play_audio(followup_mp3)
-                audio_path = record_audio(f"data/{session['session_id']}_followup_response_{idx}.wav")
-                candidate_text = stt_transcribe_audio(audio_path)
+                followup_audio_path = record_audio(output_file=f"data/{session['session_id']}_followup_response_{idx}.wav")
+                candidate_text = stt_transcribe_audio(followup_audio_path)
                 rating = evaluate_answer(candidate_text, question_obj["ideal_answer"])
 
             # response recorded
@@ -57,8 +78,8 @@ def run_interview(session: dict, mode: str = "AGENT"):
             })
         # Candidate Q&A
         print("Do you have any questions for us?")
-        audio_path = record_audio(f"data/{session['session_id']}_candidate_question.wav")
-        candidate_question = stt_transcribe_audio(audio_path)
+        cand_ques_audio_path = record_audio(output_file=f"data/{session['session_id']}_candidate_question.wav")
+        candidate_question = stt_transcribe_audio(cand_ques_audio_path)
         answer = answer_candidate_question(candidate_question)
         answer_mp3 = generate_speech(answer, f"data/{session['session_id']}_candidate_answer.mp3")
         play_audio(answer_mp3)
@@ -80,7 +101,7 @@ def run_interview(session: dict, mode: str = "AGENT"):
     elif mode == "TRANSCRIBER":
         transcript = []
         print("Transcriber Mode: Recording entire session...")
-        audio_path = record_audio(f"data/{session['session_id']}_full_session.wav", duration=300)
-        transcript.append(stt_transcribe_audio(audio_path))
+        full_session_audio_path = record_audio(output_file=f"data/{session['session_id']}_full_session.wav")
+        transcript.append(stt_transcribe_audio(full_session_audio_path))
         session["report"] = {"transcript": " ".join(transcript)}
     return session["report"]
