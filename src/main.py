@@ -14,6 +14,8 @@ app = FastAPI()
 
 config = load_config()
 
+sessions: Dict[str, Dict[str, Any]] = {} # key: session_id, value: session->dict(cnm, ivnm, ques[dict{'question_id', 'question', 'ideal_answer', 'topic', 'difficulty'}], curr_idx, aw_idx, response[], report)
+'''
 class StartAgentRequest(BaseModel):
     candidate_name: str
     interview_set_name: str
@@ -26,8 +28,6 @@ class IntroRequest(BaseModel):
 
 class CandidateQuestionRequest(BaseModel):
     question: str
-
-sessions: Dict[str, Dict[str, Any]] = {} # key: session_id, value: session->dict(cnm, ivnm, ques[dict{'question_id', 'question', 'ideal_answer', 'topic', 'difficulty'}], curr_idx, aw_idx, response[], report)
 
 @app.post("/agent/start")
 async def start_agent(req: StartAgentRequest):
@@ -139,3 +139,36 @@ async def get_report(session_id: str):
     if not report:
         return JSONResponse({"error": "Report not generated yet"}, status_code=400)
     return {"session_id": session_id, "report": report}
+'''
+
+class RunAgentRequest(BaseModel):
+    candidate_name: str
+    interview_set_name: str
+
+class RunAgentResponse(BaseModel):
+    session_id: str
+    report: Dict[str, Any]
+
+@app.post("/agent/run", response_model=RunAgentResponse)
+async def run_agent(req: RunAgentRequest):
+    session_id = str(uuid.uuid4())
+    
+    questions = [get_question_set(i) for i in range(15) if get_question_set(i)]
+
+    sessions[session_id] = {
+        "candidate_name": req.candidate_name,
+        "interview_set_name": req.interview_set_name,
+        "questions": questions,
+        "responses": [],
+        "report": None,
+        "session_id": session_id,
+    }
+
+    report = run_interview(sessions[session_id], mode="AGENT")
+    sessions[session_id]["report"] = report
+
+    return RunAgentResponse(session_id=session_id, report=report)
+
+@app.get("/")
+def root():
+    return {"message": "running interview agent"}
