@@ -6,6 +6,8 @@ import time
 import pyaudio
 from piper import PiperVoice, SynthesisConfig
 from groq import Groq
+from dotenv import load_dotenv # for groq api
+load_dotenv() # reads .env and sets values into os.environ
 
 '''recording audio'''
 FORMAT = pyaudio.paInt16
@@ -21,46 +23,37 @@ def record_audio(output_file, max_silence=10):
     audio = pyaudio.PyAudio()
     stream = None
     vad = webrtcvad.Vad(2)  # 0-3 (aggressiveness)
-
     frames = []
     silence_start = None
-    recording_started = False
-    start_time = time.time()
 
+
+    start_time = time.time()
     try:
         stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
-
         print("Listening... speak into the mic.")
-
         while True:
             if time.time() - start_time > RECORD_SECONDS:
                 print("Timeout reached, stopping.")
                 break
-
             frame = stream.read(CHUNK, exception_on_overflow=False)
-
             # VAD expects 20, 30, or 10 ms frames at 16kHz -> so feeding 100ms
             is_speech = vad.is_speech(frame[:960], RATE)
-
             if is_speech:
                 frames.append(frame)
                 recording_started = True
                 silence_start = None
-                print("Speaking...")
             elif recording_started:
                 if silence_start is None:
                     silence_start = time.time()
                 elif time.time() - silence_start > MAX_SILENCE:
                     print("Silence detected, stopping.")
                     break
-
     finally:
         # cleanup no matter what
         if stream:
             stream.stop_stream()
             stream.close()
         audio.terminate()
-
     # save only if something was recorded
     if frames:
         wf = wave.open(output_file, "wb")
@@ -70,6 +63,7 @@ def record_audio(output_file, max_silence=10):
         wf.writeframes(b"".join(frames))
         wf.close()
         print(f"Saved recording to {output_file}")
+        return output_file
     else:
         print("No audio recorded.")
 
@@ -77,6 +71,7 @@ def record_audio(output_file, max_silence=10):
 model = whisper.load_model("base")
 
 def transcribe_audio(audio_file: str) -> str:
+    # print("DEBUG transcribe_audio input:", audio_file, type(audio_file))
     """Transcribes speech from an audio file using Whisper"""
     if not os.path.exists(audio_file):
         raise FileNotFoundError(f"Audio file not found: {audio_file}")
