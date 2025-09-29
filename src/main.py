@@ -140,7 +140,6 @@ async def get_report(session_id: str):
         return JSONResponse({"error": "Report not generated yet"}, status_code=400)
     return {"session_id": session_id, "report": report}
 '''
-
 class RunAgentRequest(BaseModel):
     candidate_name: str
     interview_set_name: str

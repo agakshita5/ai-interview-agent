@@ -25,8 +25,7 @@ def record_audio(output_file, max_silence=10):
     vad = webrtcvad.Vad(2)  # 0-3 (aggressiveness)
     frames = []
     silence_start = None
-
-
+    recording_started = False
     start_time = time.time()
     try:
         stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
@@ -71,7 +70,6 @@ def record_audio(output_file, max_silence=10):
 model = whisper.load_model("base")
 
 def transcribe_audio(audio_file: str) -> str:
-    # print("DEBUG transcribe_audio input:", audio_file, type(audio_file))
     """Transcribes speech from an audio file using Whisper"""
     if not os.path.exists(audio_file):
         raise FileNotFoundError(f"Audio file not found: {audio_file}")
