@@ -1,14 +1,10 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any
 import uuid
-import os
 from src.utils.config import load_config
 from src.api_integration.api_client import get_question_set
-from src.voice_processing.record_transcription import generate_speech, transcribe_audio as stt_transcribe_audio, ask_groq, record_audio, play_audio
-from src.nlp_evaluation.answer_evaluator import evaluate_answer
-from src.session.session_manager import personalize_intro, run_interview
+from src.session.session_manager import run_interview
 
 app = FastAPI()
 
