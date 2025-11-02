@@ -1,7 +1,11 @@
 **/tempCodeRunnerFile.py
 myvenv/
 .env
+*.env
 __pycache__/
 **/.mp3
-en_US-lessac-medium.onnx.json
+*.onnx.json
 **/.wav
+*.onnx
+node_modules/
+.DS_Store
