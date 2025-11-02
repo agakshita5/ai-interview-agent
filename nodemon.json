@@ -1,0 +1,20 @@
+{
+  "watch": ["src", "server.js", "package.json"],
+  "ignore": [
+    "myvenv/**/*",
+    "node_modules/**/*",
+    ".git/**/*",
+    "data/**/*",
+    "**/__pycache__/**/*",
+    "**/*.pyc",
+    "**/*.pyo",
+    "**/*.mp3",
+    "**/*.wav",
+    "**/*.onnx",
+    ".env",
+    "*.log"
+  ],
+  "ext": "js,json,py",
+  "exec": "node server.js"
+}
+
