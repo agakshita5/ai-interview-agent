@@ -15,7 +15,7 @@ navigator.mediaDevices.getUserMedia({
     addVideoStream(myVideo, stream)
 
     myPeer.on('call', call =>{
-        call.answer(stream) // only this will connect one peer 
+        call.answer(stream) // only this, will connect one peer 
         const video = document.createElement('video')
         call.on('stream', userVideoStream =>{ 
             addVideoStream(video, userVideoStream)
@@ -23,7 +23,12 @@ navigator.mediaDevices.getUserMedia({
     })
 
     socket.on('user-connected', userId =>{
-        connectToNewUser(userId, stream)
+        // if bot joined, don't show video (bot is audio-only)
+        if (!isBot(userId)) {
+            connectToNewUser(userId, stream)
+        } else {
+            console.log('Bot joined - audio only (no video)')
+        }
     })
 })
 
@@ -36,6 +41,23 @@ myPeer.on('open', id =>{
     socket.emit('join-room', ROOM_ID, id)
 })
 
+// end call button 
+document.getElementById('end-call-btn').addEventListener('click', () => {
+    // close all peer connections
+    Object.values(peers).forEach(peer => peer.close())
+    
+    // stop local video/audio stream
+    if (myVideo.srcObject) {
+        myVideo.srcObject.getTracks().forEach(track => track.stop())
+    }
+    
+    // disconnect socket
+    socket.disconnect()
+    
+    // redirect to home or show report
+    window.location.href = `/report/${ROOM_ID}`
+})
+
 function addVideoStream(video, stream){
     video.srcObject = stream // this will allow to play our video
     video.addEventListener('loadedmetadata', ()=>{
@@ -44,7 +66,18 @@ function addVideoStream(video, stream){
     videoGrid.append(video)
 }
 
+// hide bot video - bot doesn't need video, only audio
+function isBot(userId) {
+    return userId && userId.startsWith('bot-');
+}
+
 function connectToNewUser(userId, stream){
+    // don't connect to bot via PeerJS (bot uses different connection method)
+    if (isBot(userId)) {
+        console.log('Skipping PeerJS connection with bot - bot uses WebRTC signaling')
+        return;
+    }
+    
     const call = myPeer.call(userId, stream) // via peer we are connecting to new user using userId and sending it stream (audio/video)
     const video = document.createElement('video')
     call.on('stream', userVideoStream =>{ // user sending back its video stream when connected
