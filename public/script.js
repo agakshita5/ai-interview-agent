@@ -1,91 +1,167 @@
-const socket = io('/')
-const videoGrid = document.getElementById('video-grid')
-const myPeer = new Peer(undefined, {
-    host: '/',
-    port: '3001'
-})
-const myVideo = document.createElement('video')
-myVideo.muted = true // this way our own vd is not played to us like the our voice not to us
-const peers = {}
+const API_BASE = "http://localhost:8000";
+let mediaRecorder;
+let currentRoomId = ROOM_ID;
+let currentQuesIdx = 0; // for 1st ques
+let interviewActive = false;
+const startBtn = document.getElementById("startBtn");
+const recordBtn = document.getElementById("recordBtn");
+const endBtn = document.getElementById("endBtn");
+const logBox = document.getElementById("log");
+const selfVideo = document.getElementById("selfVideo");
 
-navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: true
-}).then(stream =>{
-    addVideoStream(myVideo, stream)
+function log(msg) {
+    console.log(msg);
+    logBox.innerHTML += `<div>• ${msg}</div>`;
+}
 
-    myPeer.on('call', call =>{
-        call.answer(stream) // only this, will connect one peer 
-        const video = document.createElement('video')
-        call.on('stream', userVideoStream =>{ 
-            addVideoStream(video, userVideoStream)
-        })
-    })
+startBtn.addEventListener("click", async () => {
+    interviewActive = true;
+    const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    selfVideo.srcObject = camStream;
+    const name = prompt("Enter your name to begin:");
+    if (!name) return;
 
-    socket.on('user-connected', userId =>{
-        // if bot joined, don't show video (bot is audio-only)
-        if (!isBot(userId)) {
-            connectToNewUser(userId, stream)
+    log("Starting interview...");
+    const res = await fetch(`${API_BASE}/agent/start-interview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: currentRoomId, candidateName: name }),
+    });
+    const data = await res.json();
+    log("Interview started. Playing intro...");
+    await playBotAudio(`${API_BASE}${data.audioUrl}`);
+    
+    recordBtn.disabled = false;
+    endBtn.disabled = false;
+
+    // .....
+    log("Intro finished. Asking first question...");
+    const qres = await fetch(`${API_BASE}/agent/next-question`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: currentRoomId }),
+     });
+    const qdata = await qres.json();
+    await playBotAudio(`${API_BASE}${qdata.audioUrl}`);
+    log("Bot asked first question. Starting to record...");
+    recordBtn.click();  // automatically start recording after bot speaks
+    // .....
+});
+
+recordBtn.addEventListener("click", async () => {
+    log("Recording your answer...");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(stream);
+    const analyser = audioContext.createAnalyser();
+    source.connect(analyser);
+
+    const dataArray = new Uint8Array(analyser.fftSize);
+    const SILENCE_THRESHOLD = 0.02; 
+    const MAX_SILENCE_TIME = 3000; 
+
+    let silenceStart = null;
+    let recordingStarted = false;
+    let audioChunks = [];
+
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+        log("Recording stopped. Sending to server...");
+        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+        const base64 = await blobToBase64(audioBlob);
+
+        const res = await fetch(`${API_BASE}/agent/process-audio`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: currentRoomId, audioData: base64 }),
+        });
+
+        const data = await res.json();
+        log("Server processed your answer.");
+
+        if (data.audioUrl) {
+            await playBotAudio(`${API_BASE}${data.audioUrl}`);
+            if (!interviewActive) return;
+            log("Bot responded with next question/followup.");
+            recordBtn.click();
         } else {
-            console.log('Bot joined - audio only (no video)')
+            log("No more bot audio. Check report soon.");
         }
-    })
-})
 
-socket.on('user-disconnected', userId =>{
-    if(peers[userId]) peers[userId].close()
-})
+        if (data.status === "done" || data.reportReady) {
+        log("Interview finished. Generating report...");
+        endInterview();
+        }
+    };
 
-// below code says whenever any user connects the same room execute this code; id is userid of new user
-myPeer.on('open', id =>{
-    socket.emit('join-room', ROOM_ID, id)
-})
+    mediaRecorder.start();
 
-// end call button 
-document.getElementById('end-call-btn').addEventListener('click', () => {
-    // close all peer connections
-    Object.values(peers).forEach(peer => peer.close())
+    const detectSilence = () => {
+        analyser.getByteTimeDomainData(dataArray); // dataArray is audio waveform as 8-bit int(0-255)
+        const normalized = dataArray.map(v => (v - 128) / 128); // silence is 128 (range's middle) | sound -> 100,150,..
+        // root mean square of auio samples in current frame -> small when silence and large while speaking
+        // converts live mic signal into a single number telling how “loud” it is on average -> which helps in detecting silence or speaking
+        const rms = Math.sqrt(normalized.reduce((sum, v) => sum + v * v, 0) / normalized.length);
     
-    // stop local video/audio stream
-    if (myVideo.srcObject) {
-        myVideo.srcObject.getTracks().forEach(track => track.stop())
-    }
+        if (rms > SILENCE_THRESHOLD) {
+          recordingStarted = true;
+          silenceStart = null;
+        } else if (recordingStarted) {
+          if (!silenceStart) silenceStart = performance.now();
+          if (performance.now() - silenceStart > MAX_SILENCE_TIME) {
+            log("Silence detected. Auto-stopping...");
+            mediaRecorder.stop();
+            stream.getTracks().forEach(t => t.stop());
+            return; // exit loop
+          }
+        }
     
-    // disconnect socket
-    socket.disconnect()
-    
-    // redirect to home or show report
-    window.location.href = `/report/${ROOM_ID}`
-})
+        requestAnimationFrame(detectSilence);
+    };
 
-function addVideoStream(video, stream){
-    video.srcObject = stream // this will allow to play our video
-    video.addEventListener('loadedmetadata', ()=>{
-        video.play()
-    })
-    videoGrid.append(video)
+    detectSilence();
+
+    setTimeout(() => {
+        if (mediaRecorder.state !== "inactive") {
+            log("Timeout reached. Auto-stopping...");
+            mediaRecorder.stop();
+            stream.getTracks().forEach(t => t.stop());
+        }
+    }, 15000); // record for 10 seconds automatically
+});
+
+endBtn.addEventListener("click", async () => {
+    await endInterview();
+});
+
+async function endInterview() {
+    interviewActive = false;
+    log("Fetching report...");
+    window.location.href = `/report/${currentRoomId}`;
 }
 
-// hide bot video - bot doesn't need video, only audio
-function isBot(userId) {
-    return userId && userId.startsWith('bot-');
+async function playBotAudio(url) {
+    return new Promise((resolve, reject) => {
+        const audio = new Audio(url);
+        audio.onended = () => resolve(); // resolves when bot finishes speaking
+        audio.onerror = (err) => reject(err);
+        audio.play();
+    });
 }
 
-function connectToNewUser(userId, stream){
-    // don't connect to bot via PeerJS (bot uses different connection method)
-    if (isBot(userId)) {
-        console.log('Skipping PeerJS connection with bot - bot uses WebRTC signaling')
-        return;
-    }
-    
-    const call = myPeer.call(userId, stream) // via peer we are connecting to new user using userId and sending it stream (audio/video)
-    const video = document.createElement('video')
-    call.on('stream', userVideoStream =>{ // user sending back its video stream when connected
-        addVideoStream(video, userVideoStream)
-    })
-    call.on('close', () =>{ // remove video from screen when browser/tab closed
-        video.remove()
-    })
-
-    peers[userId] = call
-}   
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+        const base64data = reader.result.split(",")[1];
+        resolve(base64data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
