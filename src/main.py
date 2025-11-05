@@ -8,7 +8,7 @@ import os
 import base64
 from src.utils.config import load_config
 from src.api_integration.api_client import get_question_set
-from src.session.session_manager import run_interview, personalize_intro
+from src.session.session_manager import personalize_intro
 from src.voice_processing.record_transcription import transcribe_audio, generate_speech, ask_groq
 from src.nlp_evaluation.answer_evaluator import evaluate_answer
 
@@ -39,10 +39,13 @@ class StartInterviewRequest(BaseModel):
     roomId: str
     candidateName: str
 
+class NextQuestionRequest(BaseModel):
+    roomId: str
+
 @app.post("/agent/start-interview")
 async def start_interview(req: StartInterviewRequest):
     # initialize interview for this room
-    questions = [get_question_set(i) for i in range(15) if i < 15]
+    questions = [get_question_set(i) for i in range(2) if i < 2]
     
     room_sessions[req.roomId] = {
         "candidate_name": req.candidateName,
@@ -111,6 +114,15 @@ async def process_audio(req: ProcessAudioRequest):
     
     return {"status": "processed", "audioUrl": None}
 
+@app.post('/agent/next-question')
+async def next_question(req: NextQuestionRequest):
+    roomId = req.roomId
+    if roomId not in room_sessions:
+        raise HTTPException(status_code=404, detail="Room session not found")
+    session = room_sessions[roomId]
+    session["state"] = "question"
+    return askNextQuestion(roomId, session)
+
 def askNextQuestion(room_id, session):
     # ask next question
     idx = session["current_question_idx"]
@@ -165,6 +177,11 @@ def processAnswer(room_id, session, candidate_text):
         # generate followup
         followup_text = f"Can you elaborate on that? {ask_groq(f'Generate a followup question based on: {candidate_text}')}"
         audio_path = generate_speech(followup_text, f"data/{room_id}_followup_{idx}.wav")
+        
+        # update last response with followup question
+        if session["responses"]:
+            session["responses"][-1]["followup_text"] = followup_text
+        
         # set state to followup - wait for followup response
         session["state"] = "followup"
         return {
