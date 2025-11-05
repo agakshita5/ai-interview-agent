@@ -1,33 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <script>
-        const ROOM_ID = "<%= roomId %>"
-    </script>
-    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js" defer></script> <!-- from peerjs docs -->
-    <!-- below line is loading socket.io js code in our frontend and servig it from our server (set up in server.js) -->
-    <script src="/socket.io/socket.io.js" defer></script>
-    <script src="script.js" defer></script>
-    <style>
-        #video-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, 300px);
-            grid-auto-rows: 300px;
-        }
-        video{
-            height: 100%;
-            width: 100%;
-            object-fit: cover;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Interview</title>
+  <script>
+    const ROOM_ID = "<%= roomId %>";
+  </script>
+  <script src="script.js" defer></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #f2f2f2;
+    }
+    button {
+      margin: 10px;
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #log {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #444;
+      width: 80%;
+      max-width: 600px;
+    }
+  </style>
 </head>
 <body>
-    <div id="video-grid"></div>
-    <button id="end-call-btn" style="position: fixed; bottom: 20px; right: 20px; padding: 15px 30px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; z-index: 1000;">
-        End Call
-    </button>
+  <h2>AI Voice Interview</h2>
+  <div>
+    <video id="selfVideo" autoplay muted playsinline style="width: 300px; border-radius: 10px;"></video>
+    <button id="startBtn">Start Interview</button>
+    <button id="recordBtn" disabled>Record Answer</button>
+    <button id="endBtn" disabled>End Interview</button>
+  </div>
+  <div id="log"></div>
 </body>
 </html>
