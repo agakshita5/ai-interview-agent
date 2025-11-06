@@ -3,13 +3,14 @@ import whisper
 import os
 import wave 
 import time
-import pyaudio
+# import pyaudio
 from piper import PiperVoice, SynthesisConfig
 from groq import Groq
 from dotenv import load_dotenv # for groq api
 load_dotenv() # reads .env and sets values into os.environ
 
 '''recording audio'''
+'''
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
@@ -65,6 +66,7 @@ def record_audio(output_file, max_silence=10):
         return output_file
     else:
         print("No audio recorded.")
+'''
 
 '''transcribing audio using whisper'''
 model = whisper.load_model("base")
@@ -119,6 +121,7 @@ def generate_speech(text: str, output_file: str = "data/output.wav", model_path:
     return output_file
 
 '''playing response'''
+'''
 def play_audio(audio_file: str, blocking: bool = True):
     if not os.path.exists(audio_file):
         print(f"Error: file not found -> {audio_file}")
@@ -146,4 +149,4 @@ def play_audio(audio_file: str, blocking: bool = True):
 
     if blocking:
         time.sleep(0.1)  # tiny pause 
-    
+'''
