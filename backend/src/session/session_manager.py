@@ -1,9 +1,5 @@
 from src.utils.config import load_config
-from src.voice_processing.record_transcription import generate_speech, transcribe_audio as stt_transcribe_audio, ask_groq, record_audio, play_audio
-from src.nlp_evaluation.answer_evaluator import evaluate_answer
-from transformers import pipeline
-import json
-from typing import Dict, List
+from src.voice_processing.record_transcription import transcribe_audio as stt_transcribe_audio, ask_groq
 from sentence_transformers import SentenceTransformer
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -42,12 +38,15 @@ def personalize_intro(candidate_name: str) -> str:
     config = load_config()
     return config["introduction_prompt"].format(candidate_name=candidate_name)
 
+''' no need of generate followup
 generator = pipeline("text-generation", model="distilgpt2")
 def generate_followup(response: str):
     prompt = f"Response: {response}\nGenerate a follow-up question to clarify. Answer in a conversational tone.\nBe concise and keep the response under 3 sentences.\nGive a **plain conversational answer**, no markdown, no formatting, no bullet points."
     result = generator(prompt, max_length=50)[0]["generated_text"]
     return result.split("\n")[-1]
+'''
 
+'''
 def run_interview(session: dict, mode: str = "AGENT"):
     config = load_config()
     if mode == "AGENT":
@@ -118,3 +117,4 @@ def run_interview(session: dict, mode: str = "AGENT"):
         transcript.append(stt_transcribe_audio(full_session_audio_path))
         session["report"] = {"transcript": " ".join(transcript)}
     return session["report"]
+'''
