@@ -69,14 +69,13 @@ def record_audio(output_file, max_silence=10):
 '''
 
 '''transcribing audio using whisper'''
-model = whisper.load_model("base")
-
 def transcribe_audio(audio_file: str) -> str:
     """Transcribes speech from an audio file using Whisper"""
     if not os.path.exists(audio_file):
         raise FileNotFoundError(f"Audio file not found: {audio_file}")
 
     try:
+        model = whisper.load_model("small")
         result = model.transcribe(audio_file)
         return result.get("text", "").strip()
     except Exception as e:
@@ -108,17 +107,20 @@ def ask_groq(prompt):
 
 '''text -> speech'''
 def generate_speech(text: str, output_file: str = "data/output.wav", model_path: str = "en_US-lessac-medium.onnx"):
-    voice = PiperVoice.load(model_path)
-    syn_config = SynthesisConfig(
-        volume=1.0,        
-        length_scale=1.3,  
-        noise_scale=0.667, 
-        noise_w_scale=0.8  
-    )
-    with wave.open(output_file, "wb") as wav_file:
-        voice.synthesize_wav(text, wav_file, syn_config=syn_config)
-
-    return output_file
+    try:
+        voice = PiperVoice.load(model_path)  # loads only when needed
+        syn_config = SynthesisConfig(
+            volume=1.0,
+            length_scale=1.3,
+            noise_scale=0.667,
+            noise_w_scale=0.8
+        )
+        with wave.open(output_file, "wb") as wav_file:
+            voice.synthesize_wav(text, wav_file, syn_config=syn_config)
+        return output_file
+    except Exception as e:
+        print(f"TTS failed: {e}")
+        return ""
 
 '''playing response'''
 '''
