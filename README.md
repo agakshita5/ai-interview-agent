@@ -1,8 +1,8 @@
 ---
 title: AI Voice Interview Agent
 emoji: 🎤
-colorFrom: cyan
-colorTo: blue
+colorFrom: indigo
+colorTo: gray
 sdk: docker
 app_file: backend/src/main.py
 pinned: false
