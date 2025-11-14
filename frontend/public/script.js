@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE = "";
 let mediaRecorder;
 let currentRoomId = ROOM_ID;
 let currentQuesIdx = 0; // for 1st ques
@@ -34,7 +34,6 @@ startBtn.addEventListener("click", async () => {
     recordBtn.disabled = false;
     endBtn.disabled = false;
 
-    // .....
     log("Intro finished. Asking first question...");
     const qres = await fetch(`${API_BASE}/agent/next-question`, { 
         method: "POST",
@@ -45,7 +44,6 @@ startBtn.addEventListener("click", async () => {
     await playBotAudio(`${API_BASE}${qdata.audioUrl}`);
     log("Bot asked first question. Starting to record...");
     recordBtn.click();  // automatically start recording after bot speaks
-    // .....
 });
 
 recordBtn.addEventListener("click", async () => {
@@ -132,7 +130,7 @@ recordBtn.addEventListener("click", async () => {
             mediaRecorder.stop();
             stream.getTracks().forEach(t => t.stop());
         }
-    }, 15000); // record for 10 seconds automatically
+    }, 15000); 
 });
 
 endBtn.addEventListener("click", async () => {
@@ -142,7 +140,21 @@ endBtn.addEventListener("click", async () => {
 async function endInterview() {
     interviewActive = false;
     log("Fetching report...");
-    window.location.href = `/report/${currentRoomId}`;
+    try {
+        const response = await fetch(`/agent/get-report/${currentRoomId}`);
+        const data = await response.json();
+
+        if (data.status === "in_progress") {
+            log("Interview still in progress. Redirecting to report page...");
+        } else {
+            log("Final report generated. Redirecting to report page...");
+        }
+
+        window.location.href = `/report/${currentRoomId}`;
+    } catch (err) {
+        console.error("Error getting report:", err);
+        log("Error getting report.");
+    }
 }
 
 async function playBotAudio(url) {
