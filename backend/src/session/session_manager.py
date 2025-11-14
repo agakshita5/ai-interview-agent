@@ -1,5 +1,5 @@
-from src.utils.config import load_config
-from src.voice_processing.record_transcription import transcribe_audio as stt_transcribe_audio, ask_groq
+from backend.src.utils.config import load_config
+from backend.src.voice_processing.record_transcription import transcribe_audio as stt_transcribe_audio, ask_groq
 from sentence_transformers import SentenceTransformer
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

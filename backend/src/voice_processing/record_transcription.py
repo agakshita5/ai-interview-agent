@@ -1,15 +1,15 @@
-import webrtcvad
+# import webrtcvad
+# import pyaudio
 import whisper
 import os
 import wave 
 import time
-# import pyaudio
 from piper import PiperVoice, SynthesisConfig
 from groq import Groq
 from dotenv import load_dotenv # for groq api
 load_dotenv() # reads .env and sets values into os.environ
 
-'''recording audio'''
+# recording audio
 '''
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
@@ -68,27 +68,26 @@ def record_audio(output_file, max_silence=10):
         print("No audio recorded.")
 '''
 
-'''transcribing audio using whisper'''
+# transcribing audio using whisper
 def transcribe_audio(audio_file: str) -> str:
-    """Transcribes speech from an audio file using Whisper"""
+    # Transcribes speech from an audio file using Whisper
     if not os.path.exists(audio_file):
         raise FileNotFoundError(f"Audio file not found: {audio_file}")
 
     try:
-        model = whisper.load_model("small")
+        model = whisper.load_model("tiny")
         result = model.transcribe(audio_file)
         return result.get("text", "").strip()
     except Exception as e:
         print(f"Transcription failed: {e}")
         return ""
 
-'''ai reasoning'''
-api_key = os.getenv("GROQ_API_KEY")
-if not api_key:
-    raise ValueError("GROQ_API_KEY environment variable not set")
-client = Groq(api_key=api_key)
-
+# ai reasoning
 def ask_groq(prompt):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY environment variable not set")
+    client = Groq(api_key=api_key)
     try:
         completion = client.chat.completions.create(
             model="openai/gpt-oss-120b", 
@@ -105,8 +104,13 @@ def ask_groq(prompt):
     except Exception as e:
         return f"I apologize, but I'm unable to process your request right now. Please try again later. (Error: {str(e)[:100]})"
 
-'''text -> speech'''
-def generate_speech(text: str, output_file: str = "data/output.wav", model_path: str = "en_US-lessac-medium.onnx"):
+# text -> speech
+def generate_speech(text: str, output_file: str, model_path: str = None):
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))  
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(BASE_DIR))  
+    if model_path is None:
+        model_path = os.path.join(PROJECT_ROOT, "en_US-lessac-low.onnx")
+
     try:
         voice = PiperVoice.load(model_path)  # loads only when needed
         syn_config = SynthesisConfig(
@@ -122,7 +126,7 @@ def generate_speech(text: str, output_file: str = "data/output.wav", model_path:
         print(f"TTS failed: {e}")
         return ""
 
-'''playing response'''
+# playing response
 '''
 def play_audio(audio_file: str, blocking: bool = True):
     if not os.path.exists(audio_file):

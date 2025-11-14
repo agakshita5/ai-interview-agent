@@ -1,16 +1,20 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import uuid
 import os
 import base64
-from src.utils.config import load_config
-from src.api_integration.api_client import get_question_set
-from src.session.session_manager import personalize_intro
-from src.voice_processing.record_transcription import transcribe_audio, generate_speech, ask_groq
-from src.nlp_evaluation.answer_evaluator import evaluate_answer
+import json
+from datetime import datetime
+from backend.src.utils.config import load_config
+from backend.src.api_integration.api_client import get_question_set
+from backend.src.session.session_manager import personalize_intro
+from backend.src.voice_processing.record_transcription import transcribe_audio, generate_speech, ask_groq
+from backend.src.nlp_evaluation.answer_evaluator import evaluate_answer
 
 app = FastAPI()
 
@@ -31,6 +35,15 @@ sessions: Dict[str, Dict[str, Any]] = {}
 # store active room sessions
 room_sessions: Dict[str, Dict[str, Any]] = {}
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
+PROJECT_ROOT = os.path.dirname(BASE_DIR) # backend
+DATA_DIR = os.path.join(PROJECT_ROOT, "data") # backend/data
+REPORT_DIR = os.path.join(DATA_DIR, "reports") # backend/data/reports
+MAIN_PROJECT_ROOT = os.path.dirname(PROJECT_ROOT) # prj
+
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(REPORT_DIR, exist_ok=True)
+
 class ProcessAudioRequest(BaseModel):
     roomId: str
     audioData: str  # base64 encoded audio
@@ -41,6 +54,15 @@ class StartInterviewRequest(BaseModel):
 
 class NextQuestionRequest(BaseModel):
     roomId: str
+
+FRONTEND_DIR = os.path.join(MAIN_PROJECT_ROOT, "frontend")
+app.mount("/public", StaticFiles(directory=os.path.join(FRONTEND_DIR, "public")), name="public")
+templates = Jinja2Templates(directory=os.path.join(FRONTEND_DIR, "views"))
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    room_id = str(uuid.uuid4())
+    return templates.TemplateResponse("room.html", {"request": request, "room_id": room_id})
 
 @app.post("/agent/start-interview")
 async def start_interview(req: StartInterviewRequest):
@@ -57,14 +79,19 @@ async def start_interview(req: StartInterviewRequest):
     }
     
     # generate intro speech
-    intro_text = personalize_intro(req.candidateName)
-    intro_audio_path = generate_speech(intro_text, f"data/{req.roomId}_intro.wav")
-    
-    return {
-        "status": "started",
-        "audioUrl": f"/agent/get-audio/{req.roomId}_intro.wav",
-        "nextState": "question"
-    }
+    try:
+        intro_text = personalize_intro(req.candidateName)
+        intro_audio_path = generate_speech(intro_text, os.path.join(DATA_DIR, f"{req.roomId}_intro.wav"))
+        if not intro_audio_path:
+            raise HTTPException(status_code=500, detail="Failed to generate intro audio")
+        else:
+            return {
+                "status": "started",
+                "audioUrl": f"/agent/get-audio/{req.roomId}_intro.wav",
+                "nextState": "question"
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/agent/process-audio")
 async def process_audio(req: ProcessAudioRequest):
@@ -76,9 +103,8 @@ async def process_audio(req: ProcessAudioRequest):
     
     session = room_sessions[room_id]
     
-    # save audio chunk temporarily
     audio_data = base64.b64decode(req.audioData)
-    temp_audio_path = f"data/{room_id}_temp_audio.wav"
+    temp_audio_path = os.path.join(DATA_DIR, f"{room_id}_temp_audio.wav")
     
     with open(temp_audio_path, 'wb') as f:
         f.write(audio_data)
@@ -91,8 +117,6 @@ async def process_audio(req: ProcessAudioRequest):
             "status": "no_speech",
             "audioUrl": None
         }
-    
-    print(f"[Python] Transcribed: {candidate_text}")
     
     # process based on interview state
     state = session["state"]
@@ -129,9 +153,9 @@ def askNextQuestion(room_id, session):
     questions = session["questions"]
     
     if idx >= len(questions):
-        # interview done - generate conclusion and final report
+        # interview done -> generate conclusion and final report
         conclusion = config["conclusion_prompt"]
-        audio_path = generate_speech(conclusion, f"data/{room_id}_conclusion.wav")
+        audio_path = generate_speech(conclusion, os.path.join(DATA_DIR, f"{room_id}_conclusion.wav"))
         session["state"] = "done"
         
         # generate final report
@@ -147,7 +171,7 @@ def askNextQuestion(room_id, session):
     question_text = question["question"]
     
     # generate question speech
-    audio_path = generate_speech(question_text, f"data/{room_id}_question_{idx}.wav")
+    audio_path = generate_speech(question_text, os.path.join(DATA_DIR, f"{room_id}_question_{idx}.wav"))
     session["state"] = "question"
     
     return {
@@ -176,13 +200,14 @@ def processAnswer(room_id, session, candidate_text):
     if rating in ["POOR", "SATISFACTORY"]:
         # generate followup
         followup_text = f"Can you elaborate on that? {ask_groq(f'Generate a followup question based on: {candidate_text}')}"
-        audio_path = generate_speech(followup_text, f"data/{room_id}_followup_{idx}.wav")
+        followup_path = os.path.join(DATA_DIR, f"{room_id}_followup_{idx}.wav")
+        audio_path = generate_speech(followup_text, followup_path)
         
         # update last response with followup question
         if session["responses"]:
             session["responses"][-1]["followup_text"] = followup_text
         
-        # set state to followup - wait for followup response
+        # set state to followup -> wait for followup response
         session["state"] = "followup"
         return {
             "status": "followup",
@@ -221,14 +246,12 @@ def processFollowupAnswer(room_id, session, candidate_text):
 
 @app.get("/agent/get-audio/{filename}")
 async def get_audio(filename: str):
-    # serve generated audio files
-    file_path = f"data/{filename}"
+    file_path = os.path.join(DATA_DIR, filename)
     if os.path.exists(file_path):
-        return FileResponse(file_path)
+        return FileResponse(file_path, media_type="audio/wav")
     raise HTTPException(status_code=404, detail="Audio file not found")
 
 def generateFinalReport(room_id, session):
-    # calculate final decision
     if not session["responses"]:
         return
     
@@ -237,7 +260,6 @@ def generateFinalReport(room_id, session):
     avg_score = sum(score_map.get(r, 2) for r in ratings) / len(ratings)
     decision = "HIRE" if avg_score > 2.5 else "REJECT"
     
-    from datetime import datetime
     report = {
         "room_id": room_id,
         "candidate_name": session["candidate_name"],
@@ -249,35 +271,35 @@ def generateFinalReport(room_id, session):
         "answered_questions": len(session["responses"])
     }
     
-    # save report to file for viewing
-    report_file = f"data/reports/{room_id}_report.json"
-    os.makedirs("data/reports", exist_ok=True)
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    report_file = os.path.join(REPORT_DIR, f"{room_id}_report.json")
     import json
     with open(report_file, 'w') as f:
         json.dump(report, f, indent=2)
     
-    print(f"[Python] Final report saved: {report_file}")
     return report
 
 @app.get("/agent/get-report/{roomId}")
 async def get_report(roomId: str):
-    # get final report for room
-    report_file = f"data/reports/{roomId}_report.json"
-    
-    if not os.path.exists(report_file):
-        # try to get from active session
-        if roomId in room_sessions:
-            report = generateFinalReport(roomId, room_sessions[roomId])
-            if report:
-                return report
-        raise HTTPException(status_code=404, detail="Report not found")
-    
-    import json
-    with open(report_file, 'r') as f:
-        report = json.load(f)
-    
-    return report
+    report_path = os.path.join(REPORT_DIR, f"{roomId}_report.json")
 
-@app.get("/")
+    if os.path.exists(report_path):
+        with open(report_path, "r") as f:
+            return json.load(f)
+
+    if roomId in room_sessions:
+        session = room_sessions[roomId]
+        if session.get("responses"):
+            return generateFinalReport(roomId, session)
+        else:
+            return {"status": "in_progress", "message": "Interview is still in progress."}
+
+    raise HTTPException(status_code=404, detail="Report not found")
+
+@app.get("/report/{room_id}", response_class=HTMLResponse)
+def report_page(request: Request, room_id: str):
+    return templates.TemplateResponse("report.html", {"request": request, "room_id": room_id})
+
+@app.get("/check")
 def root():
     return {"message": "Voice agent API running", "status": "ready"}
