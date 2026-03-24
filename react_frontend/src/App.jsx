@@ -9,7 +9,16 @@ export default function App(){
                 </nav>
             </header>
             <main>
-                <h1>hehe</h1>
+                <div className="container">
+                    <div className="upload">
+                        <h2>Upload Resume</h2>
+                        <div className="drop_box">
+                            <h4>Select File</h4>
+                            <p>Files Supported: PDF, TEXT, DOC , DOCX</p>
+                            <button className="btn">Choose File</button>
+                        </div>
+                    </div>
+                </div> 
             </main>
         </>
     )

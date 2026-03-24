@@ -1,3 +1,6 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
 * {
     box-sizing: border-box;
 }
@@ -16,4 +19,65 @@ nav {
 nav>h1 {
     padding-left: 1rem;
 }
+.container {
+    height: 90vh;
+    width: 100%;
+    align-items: center;
+    display: flex;
+    justify-content: center;
+  }
+.upload{
+    color: #1e2244;
+    border-radius: 10px;
+    box-shadow: 0 5px 10px 0 rgba(0, 0, 0, 0.3);
+    width: 500px;
+    height: 230px;
+    background-color: #ffffff;
+    padding: 5px 30px;
+}
+.upload h2{
+    font-size: 25px;
+    font-weight: 700;
+}
+.drop_box {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    border: 3px dotted #a3a3a3;
+    border-radius: 5px;
+}
+  
+.drop_box h4 {
+    font-size: 18px;
+    font-weight: 500;
+    margin-top: 10px;
+    margin-bottom: 2px;
+    color: #2e2e2e;
+}
 
+.drop_box p {
+    font-size: 12px;
+    color: #a3a3a3;
+}
+
+.btn {
+    margin-bottom: 10px;
+    text-decoration: none;
+    background-color: #005af0;
+    color: #ffffff;
+    padding: 10px 20px;
+    border: none;
+    outline: none;
+    transition: 0.3s;
+}
+
+.btn:hover{
+    text-decoration: none;
+    background-color: #ffffff;
+    color: #005af0;
+    padding: 10px 20px;
+    border: none;
+    outline: 1px solid #010101;
+}
