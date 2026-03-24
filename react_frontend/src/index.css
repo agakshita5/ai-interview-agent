@@ -1,0 +1,19 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0px;
+    font-family: Inter, sans-serif;
+    background-color: #40488e;
+    color: whitesmoke;
+}
+nav {
+    display: flex;
+    height: 100%;
+    background-color: #1e2244;
+}
+nav>h1 {
+    padding-left: 1rem;
+}
+
