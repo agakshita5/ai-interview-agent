@@ -31,7 +31,7 @@ nav>h1 {
     border-radius: 10px;
     box-shadow: 0 5px 10px 0 rgba(0, 0, 0, 0.3);
     width: 500px;
-    height: 230px;
+    height: fit-content;
     background-color: #ffffff;
     padding: 5px 30px;
 }
@@ -62,7 +62,7 @@ nav>h1 {
     color: #a3a3a3;
 }
 
-.btn {
+.upload-btn {
     margin-bottom: 10px;
     text-decoration: none;
     background-color: #005af0;
@@ -73,7 +73,7 @@ nav>h1 {
     transition: 0.3s;
 }
 
-.btn:hover{
+.upload-btn:hover{
     text-decoration: none;
     background-color: #ffffff;
     color: #005af0;
