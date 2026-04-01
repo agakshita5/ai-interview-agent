@@ -19,6 +19,7 @@ export default function Interview() {
     const roomIdRef = useRef(roomFromNav);
     const videoRef = useRef(null);
     const streamRef = useRef(null);
+    const audioContextRef = useRef(null);
     const recRef = useRef(null);
     const chunksRef = useRef([]);
     const stopRecFn = useRef(null);
@@ -39,7 +40,9 @@ export default function Interview() {
 
     async function playUrl(path) {
         if (!path) return;
-        const a = new Audio(path.startsWith("http") ? path : `${API}${path}`);
+        const audioUrl = path.startsWith("http") ? path : `${API}${path}`;
+        const a = new Audio(audioUrl);
+        a.crossOrigin = "anonymous";
         await new Promise((res, rej) => {
             a.onended = res;
             a.onerror = rej;
@@ -51,31 +54,90 @@ export default function Interview() {
         return new Promise((resolve, reject) => {
             const stream = streamRef.current;
             if (!stream) {
-                reject(new Error("No mic"));
+                reject(new Error("Stream lost. Refresh and try again."));
                 return;
             }
-            let mime = "audio/webm;codecs=opus";
-            if (!MediaRecorder.isTypeSupported(mime)) mime = "audio/webm";
-            const mr = MediaRecorder.isTypeSupported(mime)
-                ? new MediaRecorder(stream, { mimeType: mime })
-                : new MediaRecorder(stream);
+            
+            const audioTracks = stream.getAudioTracks();
+            if (!audioTracks || audioTracks.length === 0) {
+                reject(new Error("No audio track available"));
+                return;
+            }
+            
+            if (audioTracks[0].readyState !== "live") {
+                reject(new Error("Audio track not live. Checking..."));
+                return;
+            }
+
+            let mime = "audio/webm";
+            if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+                mime = "audio/webm;codecs=opus";
+            }
+            
+            let mr;
+            try {
+                const options = { 
+                    mimeType: mime,
+                    audioBitsPerSecond: 128000 
+                };
+                mr = new MediaRecorder(stream, options);
+            } catch (e) {
+                reject(new Error(`MediaRecorder creation failed: ${e.message}`));
+                return;
+            }
+            
             recRef.current = mr;
             chunksRef.current = [];
-            mr.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
+            let hasData = false;
+            
+            mr.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    hasData = true;
+                    chunksRef.current.push(e.data);
+                }
+            };
+            
             mr.onstop = () => {
                 setShowDone(false);
                 stopRecFn.current = null;
                 clearTimeout(tmax);
-                resolve(new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" }));
+                if (!hasData || chunksRef.current.length === 0) {
+                    reject(new Error("No audio data captured"));
+                    return;
+                }
+                resolve(new Blob(chunksRef.current, { type: mime }));
             };
-            mr.onerror = () => reject(new Error("recorder"));
-            mr.start(200);
+            
+            mr.onerror = (event) => {
+                reject(new Error(`Recorder error: ${event.error?.name || 'unknown'}`));
+            };
+            
             setShowDone(true);
+            
+            try {
+                mr.start();
+            } catch (startErr) {
+                reject(new Error(`Cannot start recording: ${startErr.message}`));
+                setShowDone(false);
+                return;
+            }
+            
             stopRecFn.current = () => {
-                if (mr.state === "recording") mr.stop();
+                try {
+                    if (mr && mr.state === "recording") {
+                        mr.stop();
+                    }
+                } catch (e) {
+                    console.error("Error stopping recorder:", e);
+                }
             };
+            
             const tmax = setTimeout(() => {
-                if (mr.state === "recording") mr.stop();
+                try {
+                    if (mr && mr.state === "recording") {
+                        mr.stop();
+                    }
+                } catch (e) {}
             }, 90000);
         });
     }
@@ -97,19 +159,38 @@ export default function Interview() {
                 setStatus("Reading job description…");
                 const fd = new FormData();
                 fd.append("file", jdFile, jdFile.name);
-                const j = await fetchJson(`${API}/agent/analyze-jd-file`, { method: "POST", body: fd });
+                const res = await fetch(`${API}/agent/analyze-jd-file`, { method: "POST", body: fd });
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text || `Upload failed (${res.status})`);
+                }
+                const j = await res.json();
                 rid = j.roomId;
                 roomIdRef.current = rid;
             }
             if (!rid) throw new Error("no session");
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "user" },
-                audio: true,
-            });
+            setStatus("Requesting microphone…");
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user" },
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: true
+                    },
+                });
+            } catch (e) {
+                throw new Error(`Microphone denied. Check browser permissions.`);
+            }
+            
             streamRef.current = stream;
-            if (videoRef.current) videoRef.current.srcObject = stream;
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
 
+            setStatus("Fetching interview intro…");
             const start = await fetchJson(`${API}/agent/start-interview`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -118,13 +199,22 @@ export default function Interview() {
 
             setStatus("Introduction… (AI)");
             await playUrl(start.audioUrl);
+            
+            await new Promise(r => setTimeout(r, 500));
 
             while (true) {
                 setStatus("Your turn — speak, then tap Done…");
-                const blob = await recordAnswer();
+                let blob;
+                try {
+                    blob = await recordAnswer();
+                } catch (e) {
+                    setStatus(`Recording error: ${e.message}`);
+                    await new Promise(r => setTimeout(r, 1500));
+                    continue;
+                }
 
                 setStatus("Response recorded…");
-                await new Promise((r) => setTimeout(r, 400));
+                await new Promise((r) => setTimeout(r, 300));
                 setStatus("Processing…");
 
                 let data;
@@ -132,21 +222,25 @@ export default function Interview() {
                     data = await postAudio(blob);
                 } catch (e) {
                     setStatus(String(e.message || e));
-                    return;
+                    await new Promise(r => setTimeout(r, 1500));
+                    continue;
                 }
 
                 if (data.status === "no_speech") {
-                    setStatus("No speech detected — try again. (you)");
+                    setStatus("No speech detected — try again.");
                     continue;
                 }
 
                 if (data.audioUrl) {
                     if (data.status === "conclusion") setStatus("Closing… (AI)");
                     else if (data.status === "followup") setStatus("Follow-up… (AI)");
-                    else setStatus("Question asked… (AI)");
+                    else setStatus("Question… (AI)");
                     try {
                         await playUrl(data.audioUrl);
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error("Audio playback error:", e);
+                    }
+                    await new Promise(r => setTimeout(r, 300));
                 }
 
                 if (data.status === "conclusion" || data.status === "done") {
@@ -157,6 +251,7 @@ export default function Interview() {
             }
         } catch (e) {
             setStatus(String(e.message || e));
+            setShowBegin(true);
         }
     }
 
