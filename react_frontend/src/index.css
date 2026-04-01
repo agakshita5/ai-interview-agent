@@ -20,12 +20,13 @@ nav>h1 {
     padding-left: 1rem;
 }
 .container {
-    margin:16% 35%;
+    margin:12% 35%;
     height: 90vh;
     width: 100%;
     align-items: center;
     justify-content: center;
 }
+
 .upload{
     color: #1e2244;
     border-radius: 10px;
@@ -39,6 +40,16 @@ nav>h1 {
     font-size: 25px;
     font-weight: 700;
 }
+.upload-name {
+    width: 100%;
+    margin: 12px 0 8px;
+    padding: 8px 10px;
+    border: 1px solid #a3a3a3;
+    border-radius: 5px;
+    font-size: 15px;
+    color: #1e2244;
+}
+
 .drop_box {
     margin: 10px 0;
     display: flex;
@@ -48,7 +59,6 @@ nav>h1 {
     border: 3px dotted #a3a3a3;
     border-radius: 5px;
 }
-  
 .drop_box h4 {
     font-size: 18px;
     font-weight: 500;
@@ -56,7 +66,6 @@ nav>h1 {
     margin-bottom: 2px;
     color: #2e2e2e;
 }
-
 .drop_box p {
     font-size: 12px;
     color: #a3a3a3;
@@ -72,7 +81,6 @@ nav>h1 {
     outline: none;
     transition: 0.3s;
 }
-
 .upload-btn:hover{
     text-decoration: none;
     background-color: #ffffff;
@@ -81,7 +89,7 @@ nav>h1 {
     border: none;
     outline: 1px solid #010101;
 }
-.submit-next-btn{
+.submit-next-btn, .results-next-btn, .report-back{
     margin-left: 210px;
     margin-top: 30px;
     text-decoration: none;
@@ -92,12 +100,212 @@ nav>h1 {
     outline: none;
     font-size: larger;
     transition: 0.3s;
+    display: inline-block;
+    cursor: pointer;
 }
-.submit-next-btn:hover{
+.submit-next-btn:hover, .results-next-btn:hover, .report-back:hover{
     text-decoration: none;
     background-color: whitesmoke;
     color: #1e2244;
     padding: 10px 20px;
     border: none;
     outline: 1px solid #010101;
+}
+.upload-error {
+    color: #c53030;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+.webcam {
+    display: flex;
+    justify-content: center;
+    width: 100vw;
+    margin-top: 10px;
+}
+
+.interview-main {
+    padding: 16px;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.interview-candidate {
+    text-align: center;
+    margin: 8px 0;
+    font-size: 18px;
+    color: whitesmoke;
+}
+
+.interview-status {
+    text-align: center;
+    min-height: 1.5em;
+    margin-bottom: 12px;
+    color: whitesmoke;
+}
+
+.interview-media {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.interview-video {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 10px;
+    transform: scaleX(-1);
+    background: #000;
+    border: 2px solid #1e2244;
+}
+
+.wave-canvas {
+    border-radius: 8px;
+    width: 100%;
+    max-width: 480px;
+    height: 72px;
+    border: 2px solid #1e2244;
+}
+
+.interview-begin, .interview-done{
+    margin: 0 auto;
+    display: block;
+    margin-top: 20px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.report-shell {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #40488e;
+    min-height: 100vh;
+}
+
+.report-container {
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 5px 10px 0 rgba(0, 0, 0, 0.3);
+    color: #1e2244;
+}
+
+.report-container h1 {
+    color: #1e2244;
+    border-bottom: 3px solid #005af0;
+    padding-bottom: 10px;
+}
+
+.report-container h2 {
+    color: #1e2244;
+}
+
+.report-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    gap: 16px;
+}
+
+.report-scores {
+    text-align: right;
+}
+
+.report-score {
+    font-size: 32px;
+    font-weight: bold;
+    color: #005af0;
+}
+
+.report-decision {
+    font-size: 24px;
+    font-weight: bold;
+    padding: 10px 20px;
+    border-radius: 5px;
+    margin-top: 8px;
+}
+
+.report-decision.hire {
+    color: #28a745;
+    background: #d4edda;
+}
+
+.report-decision.reject {
+    color: #dc3545;
+    background: #f8d7da;
+}
+
+.report-summary {
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+.report-meta {
+    margin-bottom: 20px;
+}
+
+.response-item {
+    margin: 20px 0;
+    padding: 15px;
+    border-left: 4px solid #005af0;
+    background: #f8f9fa;
+}
+
+.report-question {
+    font-weight: bold;
+    color: #1e2244;
+    margin-bottom: 10px;
+}
+
+.report-answer {
+    color: #2e2e2e;
+    margin: 10px 0;
+    padding: 10px;
+    background: #ffffff;
+    border-radius: 3px;
+    border: 1px solid #e0e0e0;
+}
+
+.rating {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.rating.excellent {
+    background: #28a745;
+    color: white;
+}
+
+.rating.good {
+    background: #005af0;
+    color: white;
+}
+
+.rating.satisfactory {
+    background: #ffc107;
+    color: black;
+}
+
+.rating.poor {
+    background: #dc3545;
+    color: white;
+}
+
+.report-error {
+    color: #dc3545;
+    padding: 20px;
+    background: #f8d7da;
+    border-radius: 5px;
+}
+
+.report-shell .report-back {
+    margin-left: 0;
 }
