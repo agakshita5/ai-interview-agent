@@ -68,14 +68,20 @@ def record_audio(output_file, max_silence=10):
         print("No audio recorded.")
 '''
 
-# transcribing audio using whisper
+_whisper_model = None
+
+def _get_whisper():
+    global _whisper_model
+    if _whisper_model is None:
+        _whisper_model = whisper.load_model("tiny")
+    return _whisper_model
+
 def transcribe_audio(audio_file: str) -> str:
-    # Transcribes speech from an audio file using Whisper
     if not os.path.exists(audio_file):
         raise FileNotFoundError(f"Audio file not found: {audio_file}")
 
     try:
-        model = whisper.load_model("tiny")
+        model = _get_whisper()
         result = model.transcribe(audio_file)
         return result.get("text", "").strip()
     except Exception as e:
@@ -83,23 +89,21 @@ def transcribe_audio(audio_file: str) -> str:
         return ""
 
 # ai reasoning
-def ask_groq(prompt):
+def ask_groq(prompt, max_completion_tokens=200, model="openai/gpt-oss-120b"):
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable not set")
     client = Groq(api_key=api_key)
     try:
         completion = client.chat.completions.create(
-            model="openai/gpt-oss-120b", 
+            model=model, 
             messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=1,
-            max_completion_tokens=200,  
+                {"role": "user", "content": prompt}],
+            temperature=0.6,
+            max_completion_tokens=max_completion_tokens,  
             top_p=1,
-            reasoning_effort="medium",
             stream=False
-        )
+            )
         return completion.choices[0].message.content
     except Exception as e:
         return f"I apologize, but I'm unable to process your request right now. Please try again later. (Error: {str(e)[:100]})"

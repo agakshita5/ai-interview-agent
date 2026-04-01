@@ -1,5 +1,5 @@
 # Prompts, mode, accent settings
-introduction_prompt: "Hi {candidate_name}, welcome to the interview..."
+introduction_prompt: "Hi {candidate_name}, welcome to your voice interview for the {role} position. I will ask you a few questions based on the job description. Take your time to answer clearly."
 conclusion_prompt: "Thank you for your time. We'll follow up soon."
 mode: "AGENT"  # or "TRANSCRIBER"
 accent: "en-US-Standard-C"  # or "en-IN-Standard-A"

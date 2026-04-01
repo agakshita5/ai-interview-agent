@@ -11,8 +11,9 @@ import base64
 import json
 from datetime import datetime
 from backend.src.utils.config import load_config
-from backend.src.api_integration.api_client import get_question_set
 from backend.src.session.session_manager import personalize_intro
+from backend.src.jd_analysis import analyze_job_description
+from backend.src.jd_extract import extract_text_from_bytes
 from backend.src.voice_processing.record_transcription import transcribe_audio, generate_speech, ask_groq
 from backend.src.nlp_evaluation.answer_evaluator import evaluate_answer
 
@@ -46,7 +47,7 @@ os.makedirs(REPORT_DIR, exist_ok=True)
 
 class ProcessAudioRequest(BaseModel):
     roomId: str
-    audioData: str  # base64 encoded audio
+    audioData: str
 
 class StartInterviewRequest(BaseModel):
     roomId: str
@@ -54,6 +55,9 @@ class StartInterviewRequest(BaseModel):
 
 class NextQuestionRequest(BaseModel):
     roomId: str
+
+class AnalyzeJDRequest(BaseModel):
+    jobDescription: str
 
 FRONTEND_DIR = os.path.join(MAIN_PROJECT_ROOT, "frontend")
 app.mount("/public", StaticFiles(directory=os.path.join(FRONTEND_DIR, "public")), name="public")
@@ -64,23 +68,82 @@ def home(request: Request):
     room_id = str(uuid.uuid4())
     return templates.TemplateResponse("room.html", {"request": request, "room_id": room_id})
 
+@app.post("/agent/analyze-jd")
+async def analyze_jd(req: AnalyzeJDRequest):
+    if not req.jobDescription or not req.jobDescription.strip():
+        raise HTTPException(status_code=400, detail="Job description is empty")
+    room_id = str(uuid.uuid4())
+    try:
+        result = analyze_job_description(req.jobDescription.strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    room_sessions[room_id] = {
+        "jd_profile": result["jd_profile"],
+        "questions": result["questions"],
+        "pending": True,
+    }
+    return {
+        "roomId": room_id,
+        "jd_profile": result["jd_profile"],
+        "questions": result["questions"],
+    }
+
+@app.post("/agent/analyze-jd-file")
+async def analyze_jd_file(file: UploadFile = File(...)):
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty file")
+    name = file.filename or "upload"
+    try:
+        text = extract_text_from_bytes(name, raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
+    if not text or not str(text).strip():
+        raise HTTPException(status_code=400, detail="Could not extract text from file")
+    room_id = str(uuid.uuid4())
+    try:
+        result = analyze_job_description(str(text).strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    room_sessions[room_id] = {
+        "jd_profile": result["jd_profile"],
+        "questions": result["questions"],
+        "pending": True,
+    }
+    return {
+        "roomId": room_id,
+        "jd_profile": result["jd_profile"],
+        "questions": result["questions"],
+    }
+
 @app.post("/agent/start-interview")
 async def start_interview(req: StartInterviewRequest):
-    # initialize interview for this room
-    questions = [get_question_set(i) for i in range(2) if i < 2]
-    
+    if req.roomId not in room_sessions:
+        raise HTTPException(status_code=404, detail="Session not found. Analyze a job description first.")
+    prev = room_sessions[req.roomId]
+    if not prev.get("pending"):
+        raise HTTPException(status_code=400, detail="Interview already started for this session.")
+
+    jd_profile = prev["jd_profile"]
+    questions = prev["questions"]
+
     room_sessions[req.roomId] = {
         "candidate_name": req.candidateName,
         "room_id": req.roomId,
+        "jd_profile": jd_profile,
         "questions": questions,
         "current_question_idx": 0,
         "responses": [],
-        "state": "intro"  # intro, question, answer, done
+        "state": "intro",  # intro, question, answer, done
+        "pending": False,
     }
     
     # generate intro speech
     try:
-        intro_text = personalize_intro(req.candidateName)
+        role = jd_profile.get("role") or "this"
+        intro_text = personalize_intro(req.candidateName, role=role)
         intro_audio_path = generate_speech(intro_text, os.path.join(DATA_DIR, f"{req.roomId}_intro.wav"))
         if not intro_audio_path:
             raise HTTPException(status_code=500, detail="Failed to generate intro audio")
@@ -104,7 +167,7 @@ async def process_audio(req: ProcessAudioRequest):
     session = room_sessions[room_id]
     
     audio_data = base64.b64decode(req.audioData)
-    temp_audio_path = os.path.join(DATA_DIR, f"{room_id}_temp_audio.wav")
+    temp_audio_path = os.path.join(DATA_DIR, f"{room_id}_temp_audio.webm")
     
     with open(temp_audio_path, 'wb') as f:
         f.write(audio_data)
@@ -185,7 +248,7 @@ def processAnswer(room_id, session, candidate_text):
     idx = session["current_question_idx"]
     question = session["questions"][idx]
     
-    rating = evaluate_answer(candidate_text, question["ideal_answer"])
+    rating = evaluate_answer(candidate_text, question["ideal_answer"], jd_profile=session.get("jd_profile"))
     
     # save response
     session["responses"].append({
@@ -199,7 +262,14 @@ def processAnswer(room_id, session, candidate_text):
     # check if followup needed
     if rating in ["POOR", "SATISFACTORY"]:
         # generate followup
-        followup_text = f"Can you elaborate on that? {ask_groq(f'Generate a followup question based on: {candidate_text}')}"
+        jp = session.get("jd_profile") or {}
+        role = jp.get("role", "")
+        skills = jp.get("skills", "")
+        fu = ask_groq(
+            f"Role: {role}. Skills: {skills}. Candidate answer: {candidate_text}. "
+            "Ask one short follow-up question only, under 25 words. Plain text, no quotes."
+        )
+        followup_text = f"Can you elaborate? {fu}"
         followup_path = os.path.join(DATA_DIR, f"{room_id}_followup_{idx}.wav")
         audio_path = generate_speech(followup_text, followup_path)
         
@@ -230,7 +300,7 @@ def processFollowupAnswer(room_id, session, candidate_text):
         session["responses"][-1]["followup_answer"] = candidate_text
     
     # re-evaluate with followup answer
-    rating = evaluate_answer(candidate_text, question["ideal_answer"])
+    rating = evaluate_answer(candidate_text, question["ideal_answer"], jd_profile=session.get("jd_profile"))
     
     # update rating if improved
     if session["responses"]:
@@ -268,7 +338,8 @@ def generateFinalReport(room_id, session):
         "average_score": round(avg_score, 2),
         "decision": decision,
         "total_questions": len(session["questions"]),
-        "answered_questions": len(session["responses"])
+        "answered_questions": len(session["responses"]),
+        "jd_profile": session.get("jd_profile") or {},
     }
     
     os.makedirs(REPORT_DIR, exist_ok=True)

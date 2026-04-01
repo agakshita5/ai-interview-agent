@@ -34,9 +34,11 @@ def answer_candidate_question(question: str) -> str:
     """
     return ask_groq(groq_query)
     
-def personalize_intro(candidate_name: str) -> str:
+def personalize_intro(candidate_name: str, role: str = "") -> str:
     config = load_config()
-    return config["introduction_prompt"].format(candidate_name=candidate_name)
+    if role:
+        return config["introduction_prompt"].format(candidate_name=candidate_name, role=role)
+    return config["introduction_prompt"].format(candidate_name=candidate_name, role="this")
 
 ''' no need of generate followup
 generator = pipeline("text-generation", model="distilgpt2")
