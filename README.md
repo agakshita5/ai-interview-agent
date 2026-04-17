@@ -14,6 +14,7 @@ An AI-powered mock interview platform that conducts voice-based interviews and p
 ## Tech Stack
 
 **Frontend**: React 19, React Router
+
 **Backend**: FastAPI, Groq API, OpenAI Whisper, Piper TTS
 
 ## Quick Start
