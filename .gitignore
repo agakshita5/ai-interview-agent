@@ -14,4 +14,3 @@ tasks.txt
 package-lock.json
 .vercel/
 .render/
-frontend/
