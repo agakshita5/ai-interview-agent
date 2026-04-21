@@ -1,0 +1,6 @@
+{
+    "rewrites": [
+        { "source": "/agent/:path*", "destination": "http://15.134.65.51:8000/agent/:path*" },
+        { "source": "/check", "destination": "http://15.134.65.51:8000/check" }
+    ]
+}
